@@ -37,6 +37,8 @@ export const PerformanceRecord = IDL.Record({
   'employeeId' : IDL.Principal,
   'percentage' : IDL.Float64,
   'fileBuktiUrl' : IDL.Opt(IDL.Text),
+  'adminFeedback' : IDL.Opt(IDL.Text),
+  'adminRating' : IDL.Opt(IDL.Text),
 });
 export const UserProfile = IDL.Record({
   'nip' : IDL.Text,
@@ -102,6 +104,7 @@ export const idlService = IDL.Service({
     ),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+  'updateRecordFeedback' : IDL.Func([IDL.Nat, IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)], [], []),
 });
 
 export const idlInitArgs = [];
@@ -136,6 +139,8 @@ export const idlFactory = ({ IDL }) => {
     'employeeId' : IDL.Principal,
     'percentage' : IDL.Float64,
     'fileBuktiUrl' : IDL.Opt(IDL.Text),
+    'adminFeedback' : IDL.Opt(IDL.Text),
+    'adminRating' : IDL.Opt(IDL.Text),
   });
   const UserProfile = IDL.Record({
     'nip' : IDL.Text,
@@ -201,6 +206,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
+    'updateRecordFeedback' : IDL.Func([IDL.Nat, IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)], [], []),
   });
 };
 
