@@ -37,7 +37,7 @@ import {
   useDeletePerformanceRecord,
   usePerformanceRecordsByEmployee,
 } from "../hooks/useQueries";
-import { StorageClient, getMimeType } from "../utils/StorageClient";
+import { StorageClient } from "../utils/StorageClient";
 import { downloadRecapPdf } from "../utils/pdfRecap";
 
 function getScoreBadge(score: string) {
@@ -166,12 +166,9 @@ export default function DashboardPage() {
           agent,
         );
         const arrayBuffer = await file.arrayBuffer();
-        // Pass the file's actual MIME type and filename for correct Content-Type
         const { hash } = await storageClient.putFile(
           new Uint8Array(arrayBuffer),
           (pct) => setUploadProgress(pct),
-          file.type || getMimeType(file.name),
-          file.name,
         );
         fileUrl = await storageClient.getDirectURL(hash);
       }

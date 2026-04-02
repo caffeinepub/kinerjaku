@@ -468,30 +468,6 @@ class StorageGatewayClient {
   }
 }
 
-export function getMimeType(filename: string): string {
-  const ext = filename.split(".").pop()?.toLowerCase() || "";
-  const map: Record<string, string> = {
-    pdf: "application/pdf",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    png: "image/png",
-    gif: "image/gif",
-    webp: "image/webp",
-    svg: "image/svg+xml",
-    bmp: "image/bmp",
-    doc: "application/msword",
-    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    xls: "application/vnd.ms-excel",
-    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    txt: "text/plain",
-    csv: "text/csv",
-    mp4: "video/mp4",
-    mp3: "audio/mpeg",
-    zip: "application/zip",
-  };
-  return map[ext] || "application/octet-stream";
-}
-
 export class StorageClient {
   private readonly storageGatewayClient: StorageGatewayClient;
 
@@ -522,23 +498,18 @@ export class StorageClient {
   public async putFile(
     blobBytes: Uint8Array,
     onProgress?: (percentage: number) => void,
-    mimeType?: string,
-    filename?: string,
   ): Promise<{ hash: string }> {
-    const detectedMime =
-      mimeType ||
-      (filename ? getMimeType(filename) : "application/octet-stream");
     // HTTP headers for fetch requests (used for the PUT request to gateway)
     const httpHeaders: Headers = {
       "Content-Type": "application/json",
     };
     // Create a Blob from the bytes
     const file = new Blob([new Uint8Array(blobBytes)], {
-      type: detectedMime,
+      type: "application/octet-stream",
     });
     // File metadata headers that will be stored with the blob tree
     const fileHeaders: Headers = {
-      "Content-Type": detectedMime,
+      "Content-Type": "application/octet-stream",
       "Content-Length": file.size.toString(),
     };
 
