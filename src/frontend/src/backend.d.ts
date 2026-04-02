@@ -76,5 +76,6 @@ export interface backendInterface {
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    updatePerformanceRecord(recordId: bigint, task: string, target: bigint, realisasi: bigint, score: string, date: string): Promise<void>;
     updateRecordFeedback(recordId: bigint, adminFeedback: string | null, adminRating: string | null): Promise<void>;
 }

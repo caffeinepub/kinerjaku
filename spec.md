@@ -1,31 +1,39 @@
 # KinerjaKu
 
 ## Current State
-Backend `EmployeeProfile` and `UserProfile` do NOT have a `kecamatan` field. The registration form collects kecamatan but never saves it to the backend. The map geocodes using only `desa` name which often fails, resulting in 0 markers visible.
+Admin panel has 5 tabs: Dashboard, Data Pegawai, Data Kinerja, Rekap & Penilaian, Peta Lokasi.
+- Data Pegawai: has Edit & Delete buttons working.
+- Data Kinerja: shows all performance records in a table — NO delete/edit buttons.
+- Rekap & Penilaian: shows per-employee accordion with records, rating/feedback form — NO delete/edit per record.
+
+Backend has `deletePerformanceRecord(recordId)` but no `updatePerformanceRecord`.
 
 ## Requested Changes (Diff)
 
 ### Add
-- `kecamatan` field (Text) to `EmployeeProfile` type
-- `kecamatan` field (Text) to `UserProfile` type  
-- Map now groups/filters by kecamatan AND desa
-- Geocoding uses `desa + kecamatan + Indonesia` for better accuracy
+- Backend: `updatePerformanceRecord` function for admin to edit task, date, target, realisasi, score of a record (recalculate percentage).
+- Frontend useQueries: `useUpdatePerformanceRecord` mutation hook.
+- Data Kinerja tab: Aksi column with Edit (✏️) and Delete (🗑️) buttons per row.
+- Rekap tab: Edit and Delete buttons per record row in expanded accordion.
+- Edit dialog for performance record: form fields for date, task, target, realisasi, score.
+- Delete confirmation dialog for performance records.
 
 ### Modify
-- `createOrUpdateEmployeeProfile` accepts kecamatan
-- `saveCallerUserProfile` accepts kecamatan in UserProfile
-- `adminUpdateUserProfile` accepts kecamatan
-- Frontend registration saves kecamatan to backend
-- Admin panel shows kecamatan column
-- LeafletMap uses kecamatan for geocoding query and filter dropdown
+- AdminPage.tsx: add delete/edit state and handlers for performance records.
+- Data Kinerja table: add Aksi column.
+- RekapPegawai component: add Edit/Delete buttons in record rows.
 
 ### Remove
-- Nothing removed
+- Nothing removed.
 
 ## Implementation Plan
-1. Regenerate backend with kecamatan in EmployeeProfile and UserProfile
-2. Update IDL bindings (backend.d.ts, declarations)
-3. Update LeafletMap to use kecamatan for geocoding and filtering
-4. Update AdminPage to show kecamatan in employee table
-5. Update RegisterPage to save kecamatan to backend
-6. Update DashboardPage to save kecamatan in user profile
+1. Add `updatePerformanceRecord` to Motoko backend.
+2. Update backend.d.ts with the new function signature.
+3. Add `useUpdatePerformanceRecord` hook in useQueries.ts.
+4. Update AdminPage.tsx:
+   - Add state for deletingRecord and editingRecord.
+   - Add Edit/Delete buttons in Data Kinerja tab.
+   - Pass delete/edit handlers to RekapPegawai component.
+   - Add Delete confirmation dialog for records.
+   - Add Edit dialog for records (date, task, target, realisasi, score).
+5. Update RekapPegawai to accept and use delete/edit handlers.

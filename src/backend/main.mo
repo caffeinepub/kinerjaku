@@ -8,9 +8,9 @@ import Principal "mo:core/Principal";
 import Runtime "mo:core/Runtime";
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
-import Migration "migration";
 
-(with migration = Migration.run)
+
+
 actor {
   // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -23,12 +23,10 @@ actor {
     latitude : Float;
     longitude : Float;
     address : Text;
-    kecamatan : Text; // field added!!
+    kecamatan : Text;
     createdAt : Time.Time;
   };
 
-  // V1 type (original, no feedback fields) — kept so Motoko can deserialise
-  // the existing stable data stored under the name `performanceRecords`.
   type PerformanceRecordV1 = {
     id : Nat;
     employeeId : Principal;
@@ -43,7 +41,6 @@ actor {
     createdAt : Time.Time;
   };
 
-  // V2 type — adds admin feedback fields.
   type PerformanceRecord = {
     id : Nat;
     employeeId : Principal;
@@ -64,7 +61,7 @@ actor {
     name : Text;
     nip : Text;
     desa : Text;
-    kecamatan : Text; // field added!!
+    kecamatan : Text;
     latitude : Float;
     longitude : Float;
     address : Text;
@@ -81,22 +78,12 @@ actor {
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
-  // Keep original name + original type so the old stable data is deserialised
-  // here rather than discarded.  After migration this map is no longer written.
   let performanceRecords = Map.empty<Nat, PerformanceRecordV1>();
-
-  // New stable map that carries the V2 type.
   let performanceRecordsV2 = Map.empty<Nat, PerformanceRecord>();
 
   let employeeProfiles = Map.empty<Principal, EmployeeProfile>();
   let userProfiles = Map.empty<Principal, UserProfile>();
   var nextRecordId = 0;
-
-  // ── One-time migration on first upgrade ────────────────────────────────────
-  //
-  // `postupgrade` runs after every upgrade.  The guard (size check) ensures
-  // we only copy V1 records into V2 once — subsequent upgrades skip this block
-  // because performanceRecordsV2 will already be populated.
 
   system func postupgrade() {
     if (performanceRecordsV2.size() == 0 and performanceRecords.size() > 0) {
@@ -210,6 +197,36 @@ actor {
     performanceRecordsV2.add(nextRecordId, newRecord);
     nextRecordId += 1;
     newRecord.id;
+  };
+
+  public shared ({ caller }) func updatePerformanceRecord(
+    recordId : Nat,
+    task : Text,
+    target : Nat,
+    realisasi : Nat,
+    score : Text,
+    date : Text,
+  ) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admin can edit performance records");
+    };
+    switch (performanceRecordsV2.get(recordId)) {
+      case (null) { Runtime.trap("Record not found") };
+      case (?record) {
+        let percentage = if (target != 0) {
+          (realisasi.toFloat()) / (target.toFloat()) * 100.0 : Float;
+        } else { 0.0 };
+        performanceRecordsV2.add(recordId, {
+          record with
+          task;
+          target;
+          realisasi;
+          score;
+          date;
+          percentage;
+        });
+      };
+    };
   };
 
   public shared ({ caller }) func updateRecordFeedback(

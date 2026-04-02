@@ -54,7 +54,9 @@ import {
   useAllPerformanceRecords,
   useAllUserProfiles,
   useDeleteEmployee,
+  useDeletePerformanceRecord,
   useIsCallerAdmin,
+  useUpdatePerformanceRecord,
   useUpdateRecordFeedback,
 } from "../hooks/useQueries";
 import type { EmployeeProfile, PerformanceRecord } from "../hooks/useQueries";
@@ -124,9 +126,13 @@ type EmployeeRecap = {
 function RekapPegawai({
   records,
   employees,
+  onDeleteRecord,
+  onEditRecord,
 }: {
   records: PerformanceRecord[];
   employees: EmployeeProfile[];
+  onDeleteRecord?: (rec: PerformanceRecord) => void;
+  onEditRecord?: (rec: PerformanceRecord) => void;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [feedbackState, setFeedbackState] = useState<
@@ -344,20 +350,44 @@ function RekapPegawai({
                             />
                           </TableCell>
                           <TableCell>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-xs h-7 px-2"
-                              disabled={savingId === key}
-                              onClick={() => handleSaveFeedback(rec)}
-                            >
-                              {savingId === key ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : (
-                                <Save className="h-3 w-3" />
-                              )}
-                              <span className="ml-1">Simpan</span>
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-xs h-7 px-2"
+                                disabled={savingId === key}
+                                onClick={() => handleSaveFeedback(rec)}
+                              >
+                                {savingId === key ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Save className="h-3 w-3" />
+                                )}
+                                <span className="ml-1">Simpan</span>
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-primary"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onEditRecord?.(rec);
+                                }}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDeleteRecord?.(rec);
+                                }}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -387,6 +417,8 @@ export default function AdminPage() {
 
   const deleteEmployee = useDeleteEmployee();
   const adminUpdateUserProfile = useAdminUpdateUserProfile();
+  const deletePerformanceRecord = useDeletePerformanceRecord();
+  const updatePerformanceRecord = useUpdatePerformanceRecord();
 
   // Employee delete/edit state
   const [deletingEmployee, setDeletingEmployee] =
@@ -399,6 +431,20 @@ export default function AdminPage() {
     desa: "",
     kecamatan: "",
     address: "",
+  });
+
+  // Performance record delete/edit state
+  const [deletingRecord, setDeletingRecord] =
+    useState<PerformanceRecord | null>(null);
+  const [editingRecord, setEditingRecord] = useState<PerformanceRecord | null>(
+    null,
+  );
+  const [editRecordForm, setEditRecordForm] = useState({
+    date: "",
+    task: "",
+    target: "",
+    realisasi: "",
+    score: "",
   });
 
   const mergedMapEmployees = useMemo<EmployeeProfile[]>(() => {
@@ -517,6 +563,37 @@ export default function AdminPage() {
       isUserProfile,
     });
     setDeletingEmployee(null);
+  };
+
+  // Performance record handlers
+  const handleOpenEditRecord = (rec: PerformanceRecord) => {
+    setEditingRecord(rec);
+    setEditRecordForm({
+      date: rec.date,
+      task: rec.task,
+      target: rec.target.toString(),
+      realisasi: rec.realisasi.toString(),
+      score: rec.score,
+    });
+  };
+
+  const handleSaveEditRecord = async () => {
+    if (!editingRecord) return;
+    await updatePerformanceRecord.mutateAsync({
+      recordId: editingRecord.id,
+      task: editRecordForm.task,
+      target: BigInt(editRecordForm.target || "0"),
+      realisasi: BigInt(editRecordForm.realisasi || "0"),
+      score: editRecordForm.score,
+      date: editRecordForm.date,
+    });
+    setEditingRecord(null);
+  };
+
+  const handleConfirmDeleteRecord = async () => {
+    if (!deletingRecord) return;
+    await deletePerformanceRecord.mutateAsync(deletingRecord.id);
+    setDeletingRecord(null);
   };
 
   return (
@@ -837,6 +914,9 @@ export default function AdminPage() {
                         <TableHead className="text-xs font-semibold">
                           Rating Admin
                         </TableHead>
+                        <TableHead className="text-xs font-semibold text-center">
+                          Aksi
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -874,6 +954,28 @@ export default function AdminPage() {
                               </span>
                             )}
                           </TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-primary"
+                                data-ocid={`admin.kinerja.edit_button.${idx + 1}`}
+                                onClick={() => handleOpenEditRecord(rec)}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                                data-ocid={`admin.kinerja.delete_button.${idx + 1}`}
+                                onClick={() => setDeletingRecord(rec)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -908,6 +1010,8 @@ export default function AdminPage() {
                 <RekapPegawai
                   records={records ?? []}
                   employees={mergedMapEmployees}
+                  onDeleteRecord={setDeletingRecord}
+                  onEditRecord={handleOpenEditRecord}
                 />
               )}
             </div>
@@ -940,7 +1044,7 @@ export default function AdminPage() {
         </main>
       </div>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Employee Confirmation Dialog */}
       <AlertDialog
         open={!!deletingEmployee}
         onOpenChange={(open) => !open && setDeletingEmployee(null)}
@@ -968,6 +1072,42 @@ export default function AdminPage() {
               disabled={deleteEmployee.isPending}
             >
               {deleteEmployee.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : null}
+              Hapus
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Record Confirmation Dialog */}
+      <AlertDialog
+        open={!!deletingRecord}
+        onOpenChange={(open) => !open && setDeletingRecord(null)}
+      >
+        <AlertDialogContent data-ocid="admin.kinerja.dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Data Kinerja?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Yakin hapus data kinerja <strong>{deletingRecord?.task}</strong>{" "}
+              milik <strong>{deletingRecord?.employeeName}</strong>? Tindakan
+              ini tidak dapat dibatalkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              data-ocid="admin.kinerja.cancel_button"
+              onClick={() => setDeletingRecord(null)}
+            >
+              Batal
+            </AlertDialogCancel>
+            <AlertDialogAction
+              data-ocid="admin.kinerja.confirm_button"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleConfirmDeleteRecord}
+              disabled={deletePerformanceRecord.isPending}
+            >
+              {deletePerformanceRecord.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-1" />
               ) : null}
               Hapus
@@ -1055,6 +1195,114 @@ export default function AdminPage() {
               disabled={adminUpdateUserProfile.isPending}
             >
               {adminUpdateUserProfile.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : null}
+              Simpan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Record Dialog */}
+      <Dialog
+        open={!!editingRecord}
+        onOpenChange={(open) => !open && setEditingRecord(null)}
+      >
+        <DialogContent data-ocid="admin.kinerja.modal">
+          <DialogHeader>
+            <DialogTitle>Edit Data Kinerja</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-record-date">Tanggal</Label>
+              <Input
+                id="edit-record-date"
+                type="date"
+                data-ocid="admin.kinerja.input"
+                value={editRecordForm.date}
+                onChange={(e) =>
+                  setEditRecordForm((prev) => ({
+                    ...prev,
+                    date: e.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-record-task">Tugas</Label>
+              <Input
+                id="edit-record-task"
+                value={editRecordForm.task}
+                onChange={(e) =>
+                  setEditRecordForm((prev) => ({
+                    ...prev,
+                    task: e.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-record-target">Target</Label>
+              <Input
+                id="edit-record-target"
+                type="number"
+                value={editRecordForm.target}
+                onChange={(e) =>
+                  setEditRecordForm((prev) => ({
+                    ...prev,
+                    target: e.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-record-realisasi">Realisasi</Label>
+              <Input
+                id="edit-record-realisasi"
+                type="number"
+                value={editRecordForm.realisasi}
+                onChange={(e) =>
+                  setEditRecordForm((prev) => ({
+                    ...prev,
+                    realisasi: e.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-record-score">Nilai</Label>
+              <select
+                id="edit-record-score"
+                className="w-full border border-border rounded px-3 py-2 text-sm bg-white"
+                value={editRecordForm.score}
+                onChange={(e) =>
+                  setEditRecordForm((prev) => ({
+                    ...prev,
+                    score: e.target.value,
+                  }))
+                }
+              >
+                <option value="">-- Pilih Nilai --</option>
+                <option value="Baik">Baik</option>
+                <option value="Cukup">Cukup</option>
+                <option value="Perlu Perbaikan">Perlu Perbaikan</option>
+              </select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              data-ocid="admin.kinerja.close_button"
+              onClick={() => setEditingRecord(null)}
+            >
+              Batal
+            </Button>
+            <Button
+              data-ocid="admin.kinerja.save_button"
+              onClick={handleSaveEditRecord}
+              disabled={updatePerformanceRecord.isPending}
+            >
+              {updatePerformanceRecord.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-1" />
               ) : null}
               Simpan

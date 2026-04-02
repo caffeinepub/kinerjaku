@@ -145,6 +145,35 @@ export function useDeletePerformanceRecord() {
   });
 }
 
+export function useUpdatePerformanceRecord() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      recordId: bigint;
+      task: string;
+      target: bigint;
+      realisasi: bigint;
+      score: string;
+      date: string;
+    }) => {
+      if (!actor) throw new Error("Actor not ready");
+      return (actor as any).updatePerformanceRecord(
+        input.recordId,
+        input.task,
+        input.target,
+        input.realisasi,
+        input.score,
+        input.date,
+      );
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["performanceRecords"] });
+      qc.invalidateQueries({ queryKey: ["allPerformanceRecords"] });
+    },
+  });
+}
+
 export function useUpdateRecordFeedback() {
   const { actor } = useActor();
   const qc = useQueryClient();
