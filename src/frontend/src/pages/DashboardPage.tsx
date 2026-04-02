@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import {
   Table,
   TableBody,
@@ -11,10 +12,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { HttpAgent } from "@icp-sdk/core/agent";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
   FileDown,
+  FileText,
   Loader2,
   LogOut,
   RefreshCw,
@@ -23,6 +26,7 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { loadConfig } from "../config";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useCallerUserProfile,
@@ -30,6 +34,7 @@ import {
   useDeletePerformanceRecord,
   usePerformanceRecordsByEmployee,
 } from "../hooks/useQueries";
+import { StorageClient } from "../utils/StorageClient";
 import { downloadRecapPdf } from "../utils/pdfRecap";
 
 function getScoreBadge(score: string) {
@@ -46,6 +51,10 @@ function getScoreBadge(score: string) {
       {score}
     </Badge>
   );
+}
+
+function isImageUrl(url: string): boolean {
+  return /\.(jpg|jpeg|png|gif|webp|bmp|svg)([?#]|$)/i.test(url);
 }
 
 export default function DashboardPage() {
@@ -72,6 +81,7 @@ export default function DashboardPage() {
   const [fileName, setFileName] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   if (!identity) {
     navigate({ to: "/" });
@@ -111,11 +121,35 @@ export default function DashboardPage() {
     }
 
     setIsSubmitting(true);
+    setUploadProgress(0);
     try {
       const percentage = (realisasiNum / targetNum) * 100;
       const score =
         percentage >= 80 ? "Baik" : percentage >= 60 ? "Cukup" : "Kurang";
       const today = new Date().toISOString().split("T")[0];
+
+      let fileUrl: string | undefined = undefined;
+      const file = fileRef.current?.files?.[0];
+      if (file) {
+        const config = await loadConfig();
+        const agent = new HttpAgent({ host: config.backend_host });
+        if (config.backend_host?.includes("localhost")) {
+          await agent.fetchRootKey().catch(() => {});
+        }
+        const storageClient = new StorageClient(
+          config.bucket_name,
+          config.storage_gateway_url,
+          config.backend_canister_id,
+          config.project_id,
+          agent,
+        );
+        const arrayBuffer = await file.arrayBuffer();
+        const { hash } = await storageClient.putFile(
+          new Uint8Array(arrayBuffer),
+          (pct) => setUploadProgress(pct),
+        );
+        fileUrl = await storageClient.getDirectURL(hash);
+      }
 
       await createRecord.mutateAsync({
         employeeName: form.namaPegawai || displayName,
@@ -125,13 +159,14 @@ export default function DashboardPage() {
         score,
         date: today,
         employeeId: identity.getPrincipal(),
-        fileBuktiUrl: fileName || undefined,
+        fileBuktiUrl: fileUrl,
       });
 
       toast.success("Data kinerja berhasil disimpan!");
       setForm((prev) => ({ ...prev, tugas: "", target: "", realisasi: "" }));
       setFileName("");
       if (fileRef.current) fileRef.current.value = "";
+      setUploadProgress(0);
       refetch();
     } catch (err) {
       toast.error(`Gagal menyimpan: ${String(err)}`);
@@ -159,8 +194,8 @@ export default function DashboardPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 3 * 1024 * 1024) {
-        toast.error("Ukuran file maksimal 3MB");
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error("Ukuran file maksimal 10MB");
         e.target.value = "";
         return;
       }
@@ -304,7 +339,7 @@ export default function DashboardPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label>File Bukti</Label>
+                <Label>File Bukti Kinerja</Label>
                 <button
                   type="button"
                   className="w-full border border-dashed border-border rounded-md px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-muted/30 transition-colors text-left"
@@ -314,7 +349,7 @@ export default function DashboardPage() {
                 >
                   <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
                   <span className="text-sm text-muted-foreground">
-                    {fileName || "Pilih file bukti (maks. 3MB)"}
+                    {fileName || "Pilih file bukti (gambar / PDF, maks. 10MB)"}
                   </span>
                 </button>
                 <input
@@ -322,9 +357,21 @@ export default function DashboardPage() {
                   type="file"
                   className="hidden"
                   onChange={handleFileChange}
-                  accept="image/*,.pdf"
+                  accept="image/*,.pdf,.doc,.docx"
                   data-ocid="performance.upload_button"
                 />
+                {uploadProgress > 0 && uploadProgress < 100 && (
+                  <div
+                    className="space-y-1"
+                    data-ocid="performance.loading_state"
+                  >
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Mengupload file...</span>
+                      <span>{uploadProgress}%</span>
+                    </div>
+                    <Progress value={uploadProgress} className="h-1.5" />
+                  </div>
+                )}
               </div>
 
               <Button
@@ -416,6 +463,9 @@ export default function DashboardPage() {
                         Nilai
                       </TableHead>
                       <TableHead className="text-xs font-semibold">
+                        Bukti
+                      </TableHead>
+                      <TableHead className="text-xs font-semibold">
                         Aksi
                       </TableHead>
                     </TableRow>
@@ -440,6 +490,32 @@ export default function DashboardPage() {
                           {rec.percentage.toFixed(1)}%
                         </TableCell>
                         <TableCell>{getScoreBadge(rec.score)}</TableCell>
+                        <TableCell>
+                          {rec.fileBuktiUrl ? (
+                            <a
+                              href={rec.fileBuktiUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              title="Lihat file bukti"
+                              data-ocid={`records.upload_button.${idx + 1}`}
+                              className="inline-flex items-center justify-center h-7 w-7 rounded-md text-primary hover:bg-primary/10 transition-colors"
+                            >
+                              {isImageUrl(rec.fileBuktiUrl) ? (
+                                <img
+                                  src={rec.fileBuktiUrl}
+                                  alt="Bukti"
+                                  className="h-6 w-6 object-cover rounded"
+                                />
+                              ) : (
+                                <FileText className="h-3.5 w-3.5" />
+                              )}
+                            </a>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              -
+                            </span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Button
                             variant="ghost"

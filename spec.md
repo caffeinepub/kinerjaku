@@ -1,39 +1,26 @@
 # KinerjaKu
 
 ## Current State
-Admin panel has 5 tabs: Dashboard, Data Pegawai, Data Kinerja, Rekap & Penilaian, Peta Lokasi.
-- Data Pegawai: has Edit & Delete buttons working.
-- Data Kinerja: shows all performance records in a table — NO delete/edit buttons.
-- Rekap & Penilaian: shows per-employee accordion with records, rating/feedback form — NO delete/edit per record.
-
-Backend has `deletePerformanceRecord(recordId)` but no `updatePerformanceRecord`.
+Aplikasi manajemen kinerja pegawai dengan fitur upload file bukti kinerja. Pegawai dapat upload file saat input data kinerja, dan admin bisa melihat di tab Dokumentasi. Namun upload file saat ini hanya menggunakan `ExternalBlob.fromBytes()` yang membuat `blob:` URL sementara di memori browser -- URL ini hilang setelah halaman di-refresh dan tidak bisa diakses oleh user/device lain. Akibatnya file tidak tersimpan permanen dan admin tidak bisa melihat dokumen.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Backend: `updatePerformanceRecord` function for admin to edit task, date, target, realisasi, score of a record (recalculate percentage).
-- Frontend useQueries: `useUpdatePerformanceRecord` mutation hook.
-- Data Kinerja tab: Aksi column with Edit (✏️) and Delete (🗑️) buttons per row.
-- Rekap tab: Edit and Delete buttons per record row in expanded accordion.
-- Edit dialog for performance record: form fields for date, task, target, realisasi, score.
-- Delete confirmation dialog for performance records.
+- Integrasi blob-storage Caffeine yang sesungguhnya untuk upload file permanen ke ICP canister
+- Fungsi upload file menggunakan `uploadFile` dari hook blob-storage yang tersedia
+- Di DashboardPage: upload file dulu sebelum save record, simpan URL permanen dari blob storage
+- Di AdminPage: tampilan file bukti yang lebih baik -- tombol "Lihat File" yang membuka URL permanen
+- Di DashboardPage (tabel kinerja pegawai): kolom Bukti juga menampilkan link dokumen yang bisa diklik
 
 ### Modify
-- AdminPage.tsx: add delete/edit state and handlers for performance records.
-- Data Kinerja table: add Aksi column.
-- RekapPegawai component: add Edit/Delete buttons in record rows.
+- `DashboardPage.tsx`: Ganti logika upload dari `ExternalBlob.fromBytes()` + `getBytes()` menjadi menggunakan `uploadFile` dari blob-storage hook, simpan URL permanen
+- `AdminPage.tsx`: Pastikan `ExternalBlob.fromURL(url).getDirectURL()` sudah benar untuk URL permanen dari blob storage, tambahkan tampilan nama file dan preview lebih baik
 
 ### Remove
-- Nothing removed.
+- Penggunaan `blob:` URL sementara dari `URL.createObjectURL` untuk menyimpan file
 
 ## Implementation Plan
-1. Add `updatePerformanceRecord` to Motoko backend.
-2. Update backend.d.ts with the new function signature.
-3. Add `useUpdatePerformanceRecord` hook in useQueries.ts.
-4. Update AdminPage.tsx:
-   - Add state for deletingRecord and editingRecord.
-   - Add Edit/Delete buttons in Data Kinerja tab.
-   - Pass delete/edit handlers to RekapPegawai component.
-   - Add Delete confirmation dialog for records.
-   - Add Edit dialog for records (date, task, target, realisasi, score).
-5. Update RekapPegawai to accept and use delete/edit handlers.
+1. Pilih komponen `blob-storage`
+2. Update `DashboardPage.tsx`: gunakan hook blob-storage untuk upload file, dapatkan URL permanen, simpan ke backend
+3. Update `AdminPage.tsx`: pastikan tampilan dokumen menggunakan URL permanen dengan benar
+4. Validasi dan build

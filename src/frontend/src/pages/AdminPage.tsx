@@ -35,6 +35,9 @@ import {
   ChevronRight,
   ClipboardList,
   FileDown,
+  FileText,
+  FolderOpen,
+  ImageIcon,
   LayoutDashboard,
   Loader2,
   LogOut,
@@ -62,7 +65,36 @@ import {
 import type { EmployeeProfile, PerformanceRecord } from "../hooks/useQueries";
 import { downloadRecapPdf } from "../utils/pdfRecap";
 
-type AdminTab = "dashboard" | "pegawai" | "kinerja" | "rekap" | "peta";
+type AdminTab =
+  | "dashboard"
+  | "pegawai"
+  | "kinerja"
+  | "rekap"
+  | "peta"
+  | "dokumentasi";
+
+function isImageUrl(url: string): boolean {
+  return /\.(jpg|jpeg|png|gif|webp|bmp|svg)([?#]|$)/i.test(url);
+}
+
+function FileBuktiLink({ url, ocid }: { url: string; ocid?: string }) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      title="Lihat file bukti"
+      data-ocid={ocid}
+      className="inline-flex items-center justify-center h-7 w-7 rounded-md text-primary hover:bg-primary/10 transition-colors"
+    >
+      {isImageUrl(url) ? (
+        <ImageIcon className="h-3.5 w-3.5" />
+      ) : (
+        <FileText className="h-3.5 w-3.5" />
+      )}
+    </a>
+  );
+}
 
 function StatCard({
   label,
@@ -291,6 +323,7 @@ function RekapPegawai({
                       <TableHead className="text-xs min-w-[200px]">
                         Feedback Admin
                       </TableHead>
+                      <TableHead className="text-xs">Bukti</TableHead>
                       <TableHead className="text-xs">Aksi</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -348,6 +381,15 @@ function RekapPegawai({
                                 }))
                               }
                             />
+                          </TableCell>
+                          <TableCell>
+                            {rec.fileBuktiUrl ? (
+                              <FileBuktiLink url={rec.fileBuktiUrl} />
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                -
+                              </span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1">
@@ -472,6 +514,13 @@ export default function AdminPage() {
     return Array.from(empMap.values());
   }, [employees, userProfiles]);
 
+  // Records that have file bukti
+  const dokumentasiRecords = useMemo(() => {
+    return (records ?? []).filter(
+      (r) => r.fileBuktiUrl && r.fileBuktiUrl.trim() !== "",
+    );
+  }, [records]);
+
   if (!identity) {
     navigate({ to: "/" });
     return null;
@@ -525,6 +574,11 @@ export default function AdminPage() {
       icon: <ClipboardList className="h-4 w-4" />,
     },
     { id: "peta", label: "Peta Lokasi", icon: <MapPin className="h-4 w-4" /> },
+    {
+      id: "dokumentasi",
+      label: "Data Dokumentasi",
+      icon: <FolderOpen className="h-4 w-4" />,
+    },
   ];
 
   const handleOpenEdit = (emp: EmployeeProfile) => {
@@ -914,6 +968,9 @@ export default function AdminPage() {
                         <TableHead className="text-xs font-semibold">
                           Rating Admin
                         </TableHead>
+                        <TableHead className="text-xs font-semibold">
+                          Bukti
+                        </TableHead>
                         <TableHead className="text-xs font-semibold text-center">
                           Aksi
                         </TableHead>
@@ -948,6 +1005,18 @@ export default function AdminPage() {
                           <TableCell>
                             {rec.adminRating ? (
                               getRatingBadge(rec.adminRating)
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                -
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {rec.fileBuktiUrl ? (
+                              <FileBuktiLink
+                                url={rec.fileBuktiUrl}
+                                ocid={`admin.kinerja.upload_button.${idx + 1}`}
+                              />
                             ) : (
                               <span className="text-xs text-muted-foreground">
                                 -
@@ -1037,6 +1106,128 @@ export default function AdminPage() {
                   </div>
                 ) : (
                   <LeafletMap employees={mergedMapEmployees} />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Data Dokumentasi Tab */}
+          {activeTab === "dokumentasi" && (
+            <div data-ocid="admin.dokumentasi.section">
+              <h1 className="text-lg font-bold text-foreground mb-2">
+                Data Dokumentasi
+              </h1>
+              <p className="text-sm text-muted-foreground mb-5">
+                Daftar file bukti kinerja yang telah diupload oleh pegawai. Klik
+                ikon untuk melihat dokumen atau gambar.
+              </p>
+              <div className="bg-white rounded-lg border border-border shadow-sm overflow-hidden">
+                {recLoading ? (
+                  <div
+                    className="flex items-center justify-center py-12"
+                    data-ocid="admin.dokumentasi.loading_state"
+                  >
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    <span className="ml-2 text-muted-foreground text-sm">
+                      Memuat...
+                    </span>
+                  </div>
+                ) : dokumentasiRecords.length === 0 ? (
+                  <div
+                    className="text-center py-16 text-muted-foreground"
+                    data-ocid="admin.dokumentasi.empty_state"
+                  >
+                    <FolderOpen className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                    <p className="text-sm font-medium">
+                      Belum ada dokumentasi yang diupload
+                    </p>
+                    <p className="text-xs mt-1">
+                      File bukti akan muncul di sini setelah pegawai mengupload
+                      dokumen kinerja
+                    </p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/30">
+                        <TableHead className="text-xs font-semibold w-12">
+                          No.
+                        </TableHead>
+                        <TableHead className="text-xs font-semibold">
+                          Tanggal
+                        </TableHead>
+                        <TableHead className="text-xs font-semibold">
+                          Nama Pegawai
+                        </TableHead>
+                        <TableHead className="text-xs font-semibold">
+                          Tugas / Indikator
+                        </TableHead>
+                        <TableHead className="text-xs font-semibold">
+                          Nilai
+                        </TableHead>
+                        <TableHead className="text-xs font-semibold">
+                          Jenis File
+                        </TableHead>
+                        <TableHead className="text-xs font-semibold text-center">
+                          File Bukti
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {dokumentasiRecords.map((rec, idx) => (
+                        <TableRow
+                          key={rec.id.toString()}
+                          data-ocid={`admin.dokumentasi.item.${idx + 1}`}
+                          className={idx % 2 === 0 ? "bg-white" : "bg-muted/20"}
+                        >
+                          <TableCell className="text-xs font-medium text-muted-foreground">
+                            {idx + 1}
+                          </TableCell>
+                          <TableCell className="text-xs">{rec.date}</TableCell>
+                          <TableCell className="text-sm font-medium">
+                            {rec.employeeName}
+                          </TableCell>
+                          <TableCell className="text-xs max-w-[200px] truncate">
+                            {rec.task}
+                          </TableCell>
+                          <TableCell>{getScoreBadge(rec.score)}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs gap-1">
+                              {isImageUrl(rec.fileBuktiUrl!) ? (
+                                <>
+                                  <ImageIcon className="h-3 w-3" />
+                                  Gambar
+                                </>
+                              ) : (
+                                <>
+                                  <FileText className="h-3 w-3" />
+                                  Dokumen
+                                </>
+                              )}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 px-3 text-xs gap-1.5 text-primary border-primary hover:bg-primary/10"
+                              data-ocid={`admin.dokumentasi.upload_button.${idx + 1}`}
+                              onClick={() =>
+                                window.open(rec.fileBuktiUrl!, "_blank")
+                              }
+                            >
+                              {isImageUrl(rec.fileBuktiUrl!) ? (
+                                <ImageIcon className="h-3.5 w-3.5" />
+                              ) : (
+                                <FileText className="h-3.5 w-3.5" />
+                              )}
+                              Lihat File
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 )}
               </div>
             </div>
@@ -1184,7 +1375,7 @@ export default function AdminPage() {
           <DialogFooter>
             <Button
               variant="outline"
-              data-ocid="admin.employees.close_button"
+              data-ocid="admin.employees.cancel_button"
               onClick={() => setEditingEmployee(null)}
             >
               Batal
@@ -1214,9 +1405,9 @@ export default function AdminPage() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label htmlFor="edit-record-date">Tanggal</Label>
+              <Label htmlFor="edit-rec-date">Tanggal</Label>
               <Input
-                id="edit-record-date"
+                id="edit-rec-date"
                 type="date"
                 data-ocid="admin.kinerja.input"
                 value={editRecordForm.date}
@@ -1229,9 +1420,9 @@ export default function AdminPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="edit-record-task">Tugas</Label>
+              <Label htmlFor="edit-rec-task">Tugas</Label>
               <Input
-                id="edit-record-task"
+                id="edit-rec-task"
                 value={editRecordForm.task}
                 onChange={(e) =>
                   setEditRecordForm((prev) => ({
@@ -1241,39 +1432,41 @@ export default function AdminPage() {
                 }
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-record-target">Target</Label>
-              <Input
-                id="edit-record-target"
-                type="number"
-                value={editRecordForm.target}
-                onChange={(e) =>
-                  setEditRecordForm((prev) => ({
-                    ...prev,
-                    target: e.target.value,
-                  }))
-                }
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-rec-target">Target</Label>
+                <Input
+                  id="edit-rec-target"
+                  type="number"
+                  value={editRecordForm.target}
+                  onChange={(e) =>
+                    setEditRecordForm((prev) => ({
+                      ...prev,
+                      target: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-rec-realisasi">Realisasi</Label>
+                <Input
+                  id="edit-rec-realisasi"
+                  type="number"
+                  value={editRecordForm.realisasi}
+                  onChange={(e) =>
+                    setEditRecordForm((prev) => ({
+                      ...prev,
+                      realisasi: e.target.value,
+                    }))
+                  }
+                />
+              </div>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="edit-record-realisasi">Realisasi</Label>
-              <Input
-                id="edit-record-realisasi"
-                type="number"
-                value={editRecordForm.realisasi}
-                onChange={(e) =>
-                  setEditRecordForm((prev) => ({
-                    ...prev,
-                    realisasi: e.target.value,
-                  }))
-                }
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-record-score">Nilai</Label>
+              <Label htmlFor="edit-rec-score">Nilai</Label>
               <select
-                id="edit-record-score"
-                className="w-full border border-border rounded px-3 py-2 text-sm bg-white"
+                id="edit-rec-score"
+                className="w-full border border-border rounded-md px-3 py-2 text-sm bg-white"
                 value={editRecordForm.score}
                 onChange={(e) =>
                   setEditRecordForm((prev) => ({
@@ -1282,17 +1475,16 @@ export default function AdminPage() {
                   }))
                 }
               >
-                <option value="">-- Pilih Nilai --</option>
                 <option value="Baik">Baik</option>
                 <option value="Cukup">Cukup</option>
-                <option value="Perlu Perbaikan">Perlu Perbaikan</option>
+                <option value="Kurang">Kurang</option>
               </select>
             </div>
           </div>
           <DialogFooter>
             <Button
               variant="outline"
-              data-ocid="admin.kinerja.close_button"
+              data-ocid="admin.kinerja.cancel_button"
               onClick={() => setEditingRecord(null)}
             >
               Batal
