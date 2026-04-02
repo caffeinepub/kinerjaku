@@ -49,6 +49,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import LeafletMap from "../components/LeafletMap";
+import { clearActorCache } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   UserRole,
@@ -540,6 +541,7 @@ export default function AdminPage() {
   }
 
   const handleLogout = () => {
+    clearActorCache();
     clear();
     qc.clear();
     navigate({ to: "/" });

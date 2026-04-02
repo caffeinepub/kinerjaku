@@ -27,6 +27,7 @@ import {
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { loadConfig } from "../config";
+import { clearActorCache } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useCallerUserProfile,
@@ -186,6 +187,7 @@ export default function DashboardPage() {
   };
 
   const handleLogout = () => {
+    clearActorCache();
     clear();
     qc.clear();
     navigate({ to: "/" });

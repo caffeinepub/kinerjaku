@@ -6,7 +6,7 @@ import type {
   PerformanceRecord,
   UserProfile,
 } from "../backend";
-import { useActor } from "./useActor";
+import { useActor, waitForActor } from "./useActor";
 
 export function useCallerUserProfile() {
   const { actor, isFetching } = useActor();
@@ -93,11 +93,10 @@ export function usePerformanceRecordsByEmployee(employeeId: Principal | null) {
 }
 
 export function useSaveCallerUserProfile() {
-  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (profile: UserProfile) => {
-      if (!actor) throw new Error("Actor not ready");
+      const actor = await waitForActor();
       return actor.saveCallerUserProfile(profile);
     },
     onSuccess: () => {
@@ -107,7 +106,6 @@ export function useSaveCallerUserProfile() {
 }
 
 export function useCreatePerformanceRecord() {
-  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
@@ -120,7 +118,7 @@ export function useCreatePerformanceRecord() {
       employeeId: Principal;
       fileBuktiUrl?: string;
     }) => {
-      if (!actor) throw new Error("Actor not ready");
+      const actor = await waitForActor();
       return actor.createPerformanceRecord(input);
     },
     onSuccess: () => {
@@ -131,11 +129,10 @@ export function useCreatePerformanceRecord() {
 }
 
 export function useDeletePerformanceRecord() {
-  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (recordId: bigint) => {
-      if (!actor) throw new Error("Actor not ready");
+      const actor = await waitForActor();
       return actor.deletePerformanceRecord(recordId);
     },
     onSuccess: () => {
@@ -146,7 +143,6 @@ export function useDeletePerformanceRecord() {
 }
 
 export function useUpdatePerformanceRecord() {
-  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
@@ -157,7 +153,7 @@ export function useUpdatePerformanceRecord() {
       score: string;
       date: string;
     }) => {
-      if (!actor) throw new Error("Actor not ready");
+      const actor = await waitForActor();
       return (actor as any).updatePerformanceRecord(
         input.recordId,
         input.task,
@@ -175,7 +171,6 @@ export function useUpdatePerformanceRecord() {
 }
 
 export function useUpdateRecordFeedback() {
-  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
@@ -183,7 +178,7 @@ export function useUpdateRecordFeedback() {
       adminFeedback: string | null;
       adminRating: string | null;
     }) => {
-      if (!actor) throw new Error("Actor not ready");
+      const actor = await waitForActor();
       return actor.updateRecordFeedback(
         input.recordId,
         input.adminFeedback,
@@ -197,7 +192,6 @@ export function useUpdateRecordFeedback() {
 }
 
 export function useDeleteEmployee() {
-  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -207,7 +201,7 @@ export function useDeleteEmployee() {
       id: Principal;
       isUserProfile: boolean;
     }) => {
-      if (!actor) throw new Error("Actor not ready");
+      const actor = await waitForActor();
       if (isUserProfile) {
         return (actor as any).deleteUserProfile(id);
       }
@@ -221,7 +215,6 @@ export function useDeleteEmployee() {
 }
 
 export function useAdminUpdateUserProfile() {
-  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -231,7 +224,7 @@ export function useAdminUpdateUserProfile() {
       id: Principal;
       profile: UserProfile;
     }) => {
-      if (!actor) throw new Error("Actor not ready");
+      const actor = await waitForActor();
       return (actor as any).adminUpdateUserProfile(id, profile);
     },
     onSuccess: () => {
