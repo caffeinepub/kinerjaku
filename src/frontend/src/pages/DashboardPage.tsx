@@ -16,6 +16,8 @@ import { HttpAgent } from "@icp-sdk/core/agent";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
+  Download,
+  ExternalLink,
   FileDown,
   FileText,
   Loader2,
@@ -35,7 +37,7 @@ import {
   useDeletePerformanceRecord,
   usePerformanceRecordsByEmployee,
 } from "../hooks/useQueries";
-import { StorageClient } from "../utils/StorageClient";
+import { StorageClient, getMimeType } from "../utils/StorageClient";
 import { downloadRecapPdf } from "../utils/pdfRecap";
 
 function getScoreBadge(score: string) {
@@ -56,6 +58,25 @@ function getScoreBadge(score: string) {
 
 function isImageUrl(url: string): boolean {
   return /\.(jpg|jpeg|png|gif|webp|bmp|svg)([?#]|$)/i.test(url);
+}
+
+// Download file from URL with proper filename
+async function downloadFile(url: string, filename: string) {
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(blobUrl);
+  } catch {
+    // Fallback: open in new tab
+    window.open(url, "_blank");
+  }
 }
 
 export default function DashboardPage() {
@@ -145,9 +166,12 @@ export default function DashboardPage() {
           agent,
         );
         const arrayBuffer = await file.arrayBuffer();
+        // Pass the file's actual MIME type and filename for correct Content-Type
         const { hash } = await storageClient.putFile(
           new Uint8Array(arrayBuffer),
           (pct) => setUploadProgress(pct),
+          file.type || getMimeType(file.name),
+          file.name,
         );
         fileUrl = await storageClient.getDirectURL(hash);
       }
@@ -494,24 +518,44 @@ export default function DashboardPage() {
                         <TableCell>{getScoreBadge(rec.score)}</TableCell>
                         <TableCell>
                           {rec.fileBuktiUrl ? (
-                            <a
-                              href={rec.fileBuktiUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              title="Lihat file bukti"
-                              data-ocid={`records.upload_button.${idx + 1}`}
-                              className="inline-flex items-center justify-center h-7 w-7 rounded-md text-primary hover:bg-primary/10 transition-colors"
-                            >
-                              {isImageUrl(rec.fileBuktiUrl) ? (
-                                <img
-                                  src={rec.fileBuktiUrl}
-                                  alt="Bukti"
-                                  className="h-6 w-6 object-cover rounded"
-                                />
-                              ) : (
-                                <FileText className="h-3.5 w-3.5" />
-                              )}
-                            </a>
+                            <div className="flex items-center gap-1">
+                              <a
+                                href={rec.fileBuktiUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                title="Lihat file bukti"
+                                data-ocid={`records.upload_button.${idx + 1}`}
+                                className="inline-flex items-center justify-center h-7 w-7 rounded-md text-primary hover:bg-primary/10 transition-colors"
+                              >
+                                {isImageUrl(rec.fileBuktiUrl) ? (
+                                  <img
+                                    src={rec.fileBuktiUrl}
+                                    alt="Bukti"
+                                    className="h-6 w-6 object-cover rounded"
+                                  />
+                                ) : (
+                                  <ExternalLink className="h-3.5 w-3.5" />
+                                )}
+                              </a>
+                              <button
+                                type="button"
+                                title="Download file"
+                                onClick={() => {
+                                  const ext = rec.fileBuktiUrl!.includes(".pdf")
+                                    ? "bukti.pdf"
+                                    : isImageUrl(rec.fileBuktiUrl!)
+                                      ? "bukti-gambar.jpg"
+                                      : "bukti-dokumen";
+                                  downloadFile(
+                                    rec.fileBuktiUrl!,
+                                    `kinerja-${rec.date}-${ext}`,
+                                  );
+                                }}
+                                className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                           ) : (
                             <span className="text-xs text-muted-foreground">
                               -

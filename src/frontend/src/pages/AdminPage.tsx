@@ -34,6 +34,8 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardList,
+  Download,
+  ExternalLink,
   FileDown,
   FileText,
   FolderOpen,
@@ -78,22 +80,59 @@ function isImageUrl(url: string): boolean {
   return /\.(jpg|jpeg|png|gif|webp|bmp|svg)([?#]|$)/i.test(url);
 }
 
-function FileBuktiLink({ url, ocid }: { url: string; ocid?: string }) {
+async function downloadFile(url: string, filename: string) {
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(blobUrl);
+  } catch {
+    window.open(url, "_blank");
+  }
+}
+
+function FileBuktiLink({
+  url,
+  filename,
+  ocid,
+}: { url: string; filename?: string; ocid?: string }) {
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noreferrer"
-      title="Lihat file bukti"
-      data-ocid={ocid}
-      className="inline-flex items-center justify-center h-7 w-7 rounded-md text-primary hover:bg-primary/10 transition-colors"
-    >
-      {isImageUrl(url) ? (
-        <ImageIcon className="h-3.5 w-3.5" />
-      ) : (
-        <FileText className="h-3.5 w-3.5" />
-      )}
-    </a>
+    <div className="flex items-center gap-1">
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        title="Lihat file bukti"
+        data-ocid={ocid}
+        className="inline-flex items-center justify-center h-7 w-7 rounded-md text-primary hover:bg-primary/10 transition-colors"
+      >
+        {isImageUrl(url) ? (
+          <ImageIcon className="h-3.5 w-3.5" />
+        ) : (
+          <ExternalLink className="h-3.5 w-3.5" />
+        )}
+      </a>
+      <button
+        type="button"
+        title="Download file"
+        onClick={() =>
+          downloadFile(
+            url,
+            filename ||
+              (isImageUrl(url) ? "bukti-gambar.jpg" : "bukti-dokumen"),
+          )
+        }
+        className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+      >
+        <Download className="h-3.5 w-3.5" />
+      </button>
+    </div>
   );
 }
 
@@ -1209,22 +1248,38 @@ export default function AdminPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-center">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 px-3 text-xs gap-1.5 text-primary border-primary hover:bg-primary/10"
-                              data-ocid={`admin.dokumentasi.upload_button.${idx + 1}`}
-                              onClick={() =>
-                                window.open(rec.fileBuktiUrl!, "_blank")
-                              }
-                            >
-                              {isImageUrl(rec.fileBuktiUrl!) ? (
-                                <ImageIcon className="h-3.5 w-3.5" />
-                              ) : (
-                                <FileText className="h-3.5 w-3.5" />
-                              )}
-                              Lihat File
-                            </Button>
+                            <div className="flex items-center justify-center gap-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-3 text-xs gap-1.5 text-primary border-primary hover:bg-primary/10"
+                                data-ocid={`admin.dokumentasi.upload_button.${idx + 1}`}
+                                onClick={() =>
+                                  window.open(rec.fileBuktiUrl!, "_blank")
+                                }
+                              >
+                                {isImageUrl(rec.fileBuktiUrl!) ? (
+                                  <ImageIcon className="h-3.5 w-3.5" />
+                                ) : (
+                                  <ExternalLink className="h-3.5 w-3.5" />
+                                )}
+                                Lihat
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-3 text-xs gap-1.5 text-muted-foreground border-border hover:bg-muted/30"
+                                onClick={() => {
+                                  const fname = isImageUrl(rec.fileBuktiUrl!)
+                                    ? `bukti-${rec.date}.jpg`
+                                    : `bukti-${rec.date}.pdf`;
+                                  downloadFile(rec.fileBuktiUrl!, fname);
+                                }}
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                                Unduh
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
