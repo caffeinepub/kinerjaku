@@ -86,10 +86,6 @@ actor {
 
   // Employee Profile Functions
   public shared ({ caller }) func createOrUpdateEmployeeProfile(profile : EmployeeProfile) : async () {
-    let callerRole = AccessControl.getUserRole(accessControlState, caller);
-
-    // Only admins can create/update employee profiles
-    // This prevents users from creating profiles with admin roles or modifying other users
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("Unauthorized: Only admins can create or update employee profiles");
     };
@@ -135,25 +131,35 @@ actor {
       Runtime.trap("Unauthorized: Employees can only create their own performance records");
     };
 
-    switch (employeeProfiles.get(recordInput.employeeId)) {
-      case (null) { Runtime.trap("Employee profile does not exist") };
-      case (?employeeProfile) {
-        let percentage = if (recordInput.target != 0) {
-          (recordInput.realisasi.toFloat()) / (recordInput.target.toFloat()) * 100.0 : Float;
-        } else { 0.0 };
-
-        let newRecord : PerformanceRecord = {
-          recordInput with
-          id = nextRecordId;
-          percentage;
-          createdAt = Time.now();
-        };
-
-        performanceRecords.add(nextRecordId, newRecord);
-        nextRecordId += 1;
-        newRecord.id;
-      };
+    // Check if employee has a user profile (registered via self-registration)
+    // OR an employee profile (registered by admin)
+    let hasUserProfile = switch (userProfiles.get(recordInput.employeeId)) {
+      case (null) { false };
+      case (?_) { true };
     };
+    let hasEmployeeProfile = switch (employeeProfiles.get(recordInput.employeeId)) {
+      case (null) { false };
+      case (?_) { true };
+    };
+
+    if (not (hasUserProfile or hasEmployeeProfile)) {
+      Runtime.trap("Profil pegawai tidak ditemukan. Silakan lengkapi profil terlebih dahulu.");
+    };
+
+    let percentage = if (recordInput.target != 0) {
+      (recordInput.realisasi.toFloat()) / (recordInput.target.toFloat()) * 100.0 : Float;
+    } else { 0.0 };
+
+    let newRecord : PerformanceRecord = {
+      recordInput with
+      id = nextRecordId;
+      percentage;
+      createdAt = Time.now();
+    };
+
+    performanceRecords.add(nextRecordId, newRecord);
+    nextRecordId += 1;
+    newRecord.id;
   };
 
   public query ({ caller }) func getPerformanceRecordsByEmployee(employeeId : Principal) : async [PerformanceRecord] {
@@ -182,6 +188,14 @@ actor {
       Runtime.trap("Unauthorized: Only admin can view all employee profiles");
     };
     employeeProfiles.values().toArray();
+  };
+
+  // Get all user profiles for map (admin only)
+  public query ({ caller }) func getAllUserProfiles() : async [(Principal, UserProfile)] {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admin can view all user profiles");
+    };
+    userProfiles.entries().toArray();
   };
 
   // Delete Performance Record (admin or owner)

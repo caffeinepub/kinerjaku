@@ -78,6 +78,11 @@ export const idlService = IDL.Service({
       [IDL.Vec(PerformanceRecord)],
       ['query'],
     ),
+  'getAllUserProfiles' : IDL.Func(
+      [],
+      [IDL.Vec(IDL.Tuple(IDL.Principal, UserProfile))],
+      ['query'],
+    ),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getEmployeeProfile' : IDL.Func(
@@ -170,6 +175,11 @@ export const idlFactory = ({ IDL }) => {
     'getAllPerformanceRecords' : IDL.Func(
         [],
         [IDL.Vec(PerformanceRecord)],
+        ['query'],
+      ),
+    'getAllUserProfiles' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Tuple(IDL.Principal, UserProfile))],
         ['query'],
       ),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),

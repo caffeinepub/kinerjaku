@@ -18,12 +18,14 @@ import {
   MapPin,
   Users,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import LeafletMap from "../components/LeafletMap";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
+  UserRole,
   useAllEmployeeProfiles,
   useAllPerformanceRecords,
+  useAllUserProfiles,
   useIsCallerAdmin,
 } from "../hooks/useQueries";
 import type { EmployeeProfile } from "../hooks/useQueries";
@@ -73,6 +75,32 @@ export default function AdminPage() {
   const { data: isAdmin, isLoading: adminLoading } = useIsCallerAdmin();
   const { data: employees, isLoading: empLoading } = useAllEmployeeProfiles();
   const { data: records, isLoading: recLoading } = useAllPerformanceRecords();
+  const { data: userProfiles, isLoading: userProfilesLoading } =
+    useAllUserProfiles();
+
+  const mergedMapEmployees = useMemo<EmployeeProfile[]>(() => {
+    const empMap = new Map<string, EmployeeProfile>();
+    for (const emp of employees ?? []) {
+      empMap.set(emp.id.toString(), emp);
+    }
+    for (const [principal, profile] of userProfiles ?? []) {
+      const key = principal.toString();
+      if (!empMap.has(key)) {
+        empMap.set(key, {
+          id: principal,
+          name: profile.name,
+          nip: profile.nip,
+          desa: profile.desa,
+          latitude: profile.latitude,
+          longitude: profile.longitude,
+          address: profile.address,
+          role: UserRole.user,
+          createdAt: 0n,
+        });
+      }
+    }
+    return Array.from(empMap.values());
+  }, [employees, userProfiles]);
 
   if (!identity) {
     navigate({ to: "/" });
@@ -436,7 +464,7 @@ export default function AdminPage() {
                 Peta Lokasi Pegawai
               </h1>
               <div className="bg-white rounded-lg border border-border shadow-sm overflow-hidden">
-                {empLoading ? (
+                {empLoading || userProfilesLoading ? (
                   <div
                     className="flex items-center justify-center"
                     style={{ height: 500 }}
@@ -448,7 +476,7 @@ export default function AdminPage() {
                     </span>
                   </div>
                 ) : (
-                  <LeafletMap employees={employees ?? []} />
+                  <LeafletMap employees={mergedMapEmployees} />
                 )}
               </div>
             </div>

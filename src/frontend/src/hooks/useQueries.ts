@@ -56,6 +56,19 @@ export function useAllEmployeeProfiles() {
   });
 }
 
+export function useAllUserProfiles() {
+  const { actor, isFetching } = useActor();
+  return useQuery<Array<[Principal, UserProfile]>>({
+    queryKey: ["allUserProfiles"],
+    queryFn: async () => {
+      if (!actor) return [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (actor as any).getAllUserProfiles();
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
 export function useAllPerformanceRecords() {
   const { actor, isFetching } = useActor();
   return useQuery<PerformanceRecord[]>({

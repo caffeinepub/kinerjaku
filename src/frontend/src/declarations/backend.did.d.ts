@@ -68,6 +68,7 @@ export interface _SERVICE {
   'deletePerformanceRecord' : ActorMethod<[bigint], undefined>,
   'getAllEmployeeProfiles' : ActorMethod<[], Array<EmployeeProfile>>,
   'getAllPerformanceRecords' : ActorMethod<[], Array<PerformanceRecord>>,
+  'getAllUserProfiles' : ActorMethod<[], Array<[Principal, UserProfile]>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getEmployeeProfile' : ActorMethod<[Principal], [] | [EmployeeProfile]>,
