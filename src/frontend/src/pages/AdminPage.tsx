@@ -1,5 +1,24 @@
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -15,11 +34,14 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardList,
+  FileDown,
   LayoutDashboard,
   Loader2,
   LogOut,
   MapPin,
+  Pencil,
   Save,
+  Trash2,
   Users,
 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -27,13 +49,16 @@ import LeafletMap from "../components/LeafletMap";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   UserRole,
+  useAdminUpdateUserProfile,
   useAllEmployeeProfiles,
   useAllPerformanceRecords,
   useAllUserProfiles,
+  useDeleteEmployee,
   useIsCallerAdmin,
   useUpdateRecordFeedback,
 } from "../hooks/useQueries";
 import type { EmployeeProfile, PerformanceRecord } from "../hooks/useQueries";
+import { downloadRecapPdf } from "../utils/pdfRecap";
 
 type AdminTab = "dashboard" | "pegawai" | "kinerja" | "rekap" | "peta";
 
@@ -96,7 +121,13 @@ type EmployeeRecap = {
   records: PerformanceRecord[];
 };
 
-function RekapPegawai({ records }: { records: PerformanceRecord[] }) {
+function RekapPegawai({
+  records,
+  employees,
+}: {
+  records: PerformanceRecord[];
+  employees: EmployeeProfile[];
+}) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [feedbackState, setFeedbackState] = useState<
     Record<string, { rating: string; feedback: string }>
@@ -114,14 +145,12 @@ function RekapPegawai({ records }: { records: PerformanceRecord[] }) {
     return Array.from(map.entries()).map(([id, recs]) => {
       const avgPercentage =
         recs.reduce((s, r) => s + r.percentage, 0) / recs.length;
-      // Dominant score
       const scoreCount: Record<string, number> = {};
       for (const r of recs)
         scoreCount[r.score] = (scoreCount[r.score] ?? 0) + 1;
       const dominantScore = Object.entries(scoreCount).sort(
         (a, b) => b[1] - a[1],
       )[0][0];
-      // Latest feedback/rating
       const sorted = [...recs].sort(
         (a, b) => Number(b.createdAt) - Number(a.createdAt),
       );
@@ -152,6 +181,27 @@ function RekapPegawai({ records }: { records: PerformanceRecord[] }) {
     } finally {
       setSavingId(null);
     }
+  };
+
+  const handleDownloadPdf = (recap: EmployeeRecap, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const emp = employees.find((em) => em.id.toString() === recap.employeeId);
+    downloadRecapPdf({
+      employeeName: recap.employeeName,
+      nip: emp?.nip ?? "",
+      desa: emp?.desa ?? "",
+      address: emp?.address ?? "",
+      records: recap.records.map((r) => ({
+        date: r.date,
+        task: r.task,
+        target: r.target,
+        realisasi: r.realisasi,
+        percentage: r.percentage,
+        score: r.score,
+        adminRating: r.adminRating ?? undefined,
+        adminFeedback: r.adminFeedback ?? undefined,
+      })),
+    });
   };
 
   if (recaps.length === 0) {
@@ -195,9 +245,19 @@ function RekapPegawai({ records }: { records: PerformanceRecord[] }) {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               {getScoreBadge(recap.dominantScore)}
               {recap.latestRating && getRatingBadge(recap.latestRating)}
+              <Button
+                variant="outline"
+                size="sm"
+                data-ocid="rekap.download_button"
+                className="h-7 px-2 text-xs gap-1 text-primary border-primary hover:bg-primary/10"
+                onClick={(e) => handleDownloadPdf(recap, e)}
+              >
+                <FileDown className="h-3.5 w-3.5" />
+                PDF
+              </Button>
               {expandedId === recap.employeeId ? (
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
               ) : (
@@ -325,6 +385,22 @@ export default function AdminPage() {
   const { data: userProfiles, isLoading: userProfilesLoading } =
     useAllUserProfiles();
 
+  const deleteEmployee = useDeleteEmployee();
+  const adminUpdateUserProfile = useAdminUpdateUserProfile();
+
+  // Employee delete/edit state
+  const [deletingEmployee, setDeletingEmployee] =
+    useState<EmployeeProfile | null>(null);
+  const [editingEmployee, setEditingEmployee] =
+    useState<EmployeeProfile | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    nip: "",
+    desa: "",
+    kecamatan: "",
+    address: "",
+  });
+
   const mergedMapEmployees = useMemo<EmployeeProfile[]>(() => {
     const empMap = new Map<string, EmployeeProfile>();
     for (const emp of employees ?? []) {
@@ -338,6 +414,7 @@ export default function AdminPage() {
           name: profile.name,
           nip: profile.nip,
           desa: profile.desa,
+          kecamatan: profile.kecamatan ?? "",
           latitude: profile.latitude,
           longitude: profile.longitude,
           address: profile.address,
@@ -403,6 +480,44 @@ export default function AdminPage() {
     },
     { id: "peta", label: "Peta Lokasi", icon: <MapPin className="h-4 w-4" /> },
   ];
+
+  const handleOpenEdit = (emp: EmployeeProfile) => {
+    setEditingEmployee(emp);
+    setEditForm({
+      name: emp.name,
+      nip: emp.nip,
+      desa: emp.desa,
+      kecamatan: emp.kecamatan ?? "",
+      address: emp.address,
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingEmployee) return;
+    await adminUpdateUserProfile.mutateAsync({
+      id: editingEmployee.id,
+      profile: {
+        name: editForm.name,
+        nip: editForm.nip,
+        desa: editForm.desa,
+        kecamatan: editForm.kecamatan,
+        latitude: editingEmployee.latitude,
+        longitude: editingEmployee.longitude,
+        address: editForm.address,
+      },
+    });
+    setEditingEmployee(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingEmployee) return;
+    const isUserProfile = deletingEmployee.createdAt === 0n;
+    await deleteEmployee.mutateAsync({
+      id: deletingEmployee.id,
+      isUserProfile,
+    });
+    setDeletingEmployee(null);
+  };
 
   return (
     <div className="min-h-screen bg-[oklch(0.96_0.01_240)] flex flex-col">
@@ -490,7 +605,7 @@ export default function AdminPage() {
               <div className="grid sm:grid-cols-3 gap-4">
                 <StatCard
                   label="Total Pegawai"
-                  value={employees?.length ?? 0}
+                  value={mergedMapEmployees.length}
                   icon={<Users className="h-5 w-5" />}
                 />
                 <StatCard
@@ -566,14 +681,14 @@ export default function AdminPage() {
                 Data Pegawai
               </h1>
               <div className="bg-white rounded-lg border border-border shadow-sm overflow-hidden">
-                {empLoading ? (
+                {empLoading || userProfilesLoading ? (
                   <div
                     className="flex items-center justify-center py-12"
                     data-ocid="admin.employees.loading_state"
                   >
                     <Loader2 className="h-6 w-6 animate-spin text-primary" />
                   </div>
-                ) : employees && employees.length > 0 ? (
+                ) : mergedMapEmployees.length > 0 ? (
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/30">
@@ -587,34 +702,88 @@ export default function AdminPage() {
                           Desa
                         </TableHead>
                         <TableHead className="text-xs font-semibold">
+                          Kecamatan
+                        </TableHead>
+                        <TableHead className="text-xs font-semibold">
+                          Alamat
+                        </TableHead>
+                        <TableHead className="text-xs font-semibold">
                           Role
+                        </TableHead>
+                        <TableHead className="text-xs font-semibold text-center">
+                          Aksi
                         </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {employees.map((emp: EmployeeProfile, idx: number) => (
-                        <TableRow
-                          key={emp.id.toString()}
-                          data-ocid={`admin.employees.item.${idx + 1}`}
-                          className={idx % 2 === 0 ? "bg-white" : "bg-muted/20"}
-                        >
-                          <TableCell className="text-sm font-medium">
-                            {emp.name}
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
-                            {emp.nip}
-                          </TableCell>
-                          <TableCell className="text-xs">{emp.desa}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="outline"
-                              className="text-xs capitalize"
-                            >
-                              {emp.role}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {mergedMapEmployees.map(
+                        (emp: EmployeeProfile, idx: number) => (
+                          <TableRow
+                            key={emp.id.toString()}
+                            data-ocid={`admin.employees.item.${idx + 1}`}
+                            className={
+                              idx % 2 === 0 ? "bg-white" : "bg-muted/20"
+                            }
+                          >
+                            <TableCell className="text-sm font-medium">
+                              {emp.name}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {emp.nip}
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              {emp.desa}
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              {emp.kecamatan || "-"}
+                            </TableCell>
+                            <TableCell className="text-xs max-w-[160px] truncate">
+                              {emp.address || "-"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="outline"
+                                className="text-xs capitalize"
+                              >
+                                {emp.role}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center justify-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 text-muted-foreground hover:text-primary"
+                                  data-ocid={`admin.employees.edit_button.${idx + 1}`}
+                                  onClick={() => handleOpenEdit(emp)}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                                  data-ocid={`admin.employees.delete_button.${idx + 1}`}
+                                  disabled={
+                                    deleteEmployee.isPending &&
+                                    deletingEmployee?.id.toString() ===
+                                      emp.id.toString()
+                                  }
+                                  onClick={() => setDeletingEmployee(emp)}
+                                >
+                                  {deleteEmployee.isPending &&
+                                  deletingEmployee?.id.toString() ===
+                                    emp.id.toString() ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  )}
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ),
+                      )}
                     </TableBody>
                   </Table>
                 ) : (
@@ -729,14 +898,17 @@ export default function AdminPage() {
               </h1>
               <p className="text-sm text-muted-foreground mb-5">
                 Klik nama pegawai untuk melihat detail dan mengisi penilaian
-                serta feedback.
+                serta feedback. Klik tombol PDF untuk mengunduh rekapitulasi.
               </p>
               {recLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 </div>
               ) : (
-                <RekapPegawai records={records ?? []} />
+                <RekapPegawai
+                  records={records ?? []}
+                  employees={mergedMapEmployees}
+                />
               )}
             </div>
           )}
@@ -767,6 +939,129 @@ export default function AdminPage() {
           )}
         </main>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        open={!!deletingEmployee}
+        onOpenChange={(open) => !open && setDeletingEmployee(null)}
+      >
+        <AlertDialogContent data-ocid="admin.employees.dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Pegawai?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menghapus pegawai{" "}
+              <strong>{deletingEmployee?.name}</strong>? Tindakan ini tidak
+              dapat dibatalkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              data-ocid="admin.employees.cancel_button"
+              onClick={() => setDeletingEmployee(null)}
+            >
+              Batal
+            </AlertDialogCancel>
+            <AlertDialogAction
+              data-ocid="admin.employees.confirm_button"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleConfirmDelete}
+              disabled={deleteEmployee.isPending}
+            >
+              {deleteEmployee.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : null}
+              Hapus
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Edit Employee Dialog */}
+      <Dialog
+        open={!!editingEmployee}
+        onOpenChange={(open) => !open && setEditingEmployee(null)}
+      >
+        <DialogContent data-ocid="admin.employees.modal">
+          <DialogHeader>
+            <DialogTitle>Edit Data Pegawai</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-name">Nama</Label>
+              <Input
+                id="edit-name"
+                data-ocid="admin.employees.input"
+                value={editForm.name}
+                onChange={(e) =>
+                  setEditForm((prev) => ({ ...prev, name: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-nip">NIP</Label>
+              <Input
+                id="edit-nip"
+                value={editForm.nip}
+                onChange={(e) =>
+                  setEditForm((prev) => ({ ...prev, nip: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-desa">Desa</Label>
+              <Input
+                id="edit-desa"
+                value={editForm.desa}
+                onChange={(e) =>
+                  setEditForm((prev) => ({ ...prev, desa: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-kecamatan">Kecamatan</Label>
+              <Input
+                id="edit-kecamatan"
+                value={editForm.kecamatan}
+                onChange={(e) =>
+                  setEditForm((prev) => ({
+                    ...prev,
+                    kecamatan: e.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-address">Alamat</Label>
+              <Input
+                id="edit-address"
+                value={editForm.address}
+                onChange={(e) =>
+                  setEditForm((prev) => ({ ...prev, address: e.target.value }))
+                }
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              data-ocid="admin.employees.close_button"
+              onClick={() => setEditingEmployee(null)}
+            >
+              Batal
+            </Button>
+            <Button
+              data-ocid="admin.employees.save_button"
+              onClick={handleSaveEdit}
+              disabled={adminUpdateUserProfile.isPending}
+            >
+              {adminUpdateUserProfile.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : null}
+              Simpan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <footer className="py-3 text-center text-muted-foreground text-xs border-t border-border bg-white">
         © {new Date().getFullYear()}. Dibangun dengan ❤️ menggunakan{" "}

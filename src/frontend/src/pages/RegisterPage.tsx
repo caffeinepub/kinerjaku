@@ -97,6 +97,7 @@ export default function RegisterPage() {
         name: form.nama,
         nip: form.nip,
         desa: form.desa,
+        kecamatan: form.kecamatan,
         address: fullAddress,
         latitude: coords?.lat ?? 0,
         longitude: coords?.lng ?? 0,

@@ -1,31 +1,31 @@
 # KinerjaKu
 
 ## Current State
-Aplikasi dashboard kinerja pegawai dengan:
-- Backend: PerformanceRecord (id, employeeId, employeeName, task, target, realisasi, percentage, score, date, fileBuktiUrl, createdAt)
-- Admin panel dengan tab: Dashboard, Data Pegawai, Data Kinerja, Peta Lokasi
-- Pegawai dapat input data kinerja sendiri
+Backend `EmployeeProfile` and `UserProfile` do NOT have a `kecamatan` field. The registration form collects kecamatan but never saves it to the backend. The map geocodes using only `desa` name which often fails, resulting in 0 markers visible.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Field `adminFeedback: ?Text` dan `adminRating: ?Text` di PerformanceRecord (backend)
-- Fungsi `updateRecordFeedback(recordId, adminFeedback, adminRating)` di backend (admin only)
-- Tab baru "Rekap Pegawai" di AdminPage (frontend)
-  - Rekap per pegawai: nama, total tugas, rata-rata persentase, nilai terbanyak
-  - Expand per pegawai untuk lihat semua data kinerja
-  - Kolom Feedback & Rating admin di tabel kinerja (form inline)
-- Fungsi `getEmployeeRecapWithFeedback` di frontend untuk agregasi data per pegawai
+- `kecamatan` field (Text) to `EmployeeProfile` type
+- `kecamatan` field (Text) to `UserProfile` type  
+- Map now groups/filters by kecamatan AND desa
+- Geocoding uses `desa + kecamatan + Indonesia` for better accuracy
 
 ### Modify
-- backend.d.ts: tambah field adminFeedback/adminRating di PerformanceRecord interface, tambah updateRecordFeedback
-- AdminPage: tambah tab "rekap" di navItems, tambah komponen RekapPegawai
+- `createOrUpdateEmployeeProfile` accepts kecamatan
+- `saveCallerUserProfile` accepts kecamatan in UserProfile
+- `adminUpdateUserProfile` accepts kecamatan
+- Frontend registration saves kecamatan to backend
+- Admin panel shows kecamatan column
+- LeafletMap uses kecamatan for geocoding query and filter dropdown
 
 ### Remove
-- Tidak ada
+- Nothing removed
 
 ## Implementation Plan
-1. Update main.mo: tambah field adminFeedback & adminRating optional di PerformanceRecord, fungsi updateRecordFeedback (admin only)
-2. Update backend.d.ts sesuai perubahan
-3. Update useQueries.ts: tambah hook useUpdateRecordFeedback
-4. Update AdminPage.tsx: tambah tab Rekap dengan tabel rekap per pegawai + inline feedback form
+1. Regenerate backend with kecamatan in EmployeeProfile and UserProfile
+2. Update IDL bindings (backend.d.ts, declarations)
+3. Update LeafletMap to use kecamatan for geocoding and filtering
+4. Update AdminPage to show kecamatan in employee table
+5. Update RegisterPage to save kecamatan to backend
+6. Update DashboardPage to save kecamatan in user profile

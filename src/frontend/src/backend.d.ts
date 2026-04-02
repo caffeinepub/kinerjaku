@@ -9,6 +9,7 @@ export interface None {
 export type Option<T> = Some<T> | None;
 export interface PerformanceRecord {
     id: bigint;
+    adminRating?: string;
     employeeName: string;
     realisasi: bigint;
     date: string;
@@ -17,10 +18,9 @@ export interface PerformanceRecord {
     score: string;
     target: bigint;
     employeeId: Principal;
+    adminFeedback?: string;
     percentage: number;
     fileBuktiUrl?: string;
-    adminFeedback?: string;
-    adminRating?: string;
 }
 export interface EmployeeProfile {
     id: Principal;
@@ -31,6 +31,7 @@ export interface EmployeeProfile {
     createdAt: Time;
     role: UserRole;
     longitude: number;
+    kecamatan: string;
     address: string;
 }
 export type Time = bigint;
@@ -40,6 +41,7 @@ export interface UserProfile {
     desa: string;
     name: string;
     longitude: number;
+    kecamatan: string;
     address: string;
 }
 export enum UserRole {
@@ -48,6 +50,7 @@ export enum UserRole {
     guest = "guest"
 }
 export interface backendInterface {
+    adminUpdateUserProfile(id: Principal, profile: UserProfile): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     createOrUpdateEmployeeProfile(profile: EmployeeProfile): Promise<void>;
     createPerformanceRecord(recordInput: {
@@ -60,9 +63,12 @@ export interface backendInterface {
         employeeId: Principal;
         fileBuktiUrl?: string;
     }): Promise<bigint>;
+    deleteEmployeeProfile(id: Principal): Promise<void>;
     deletePerformanceRecord(recordId: bigint): Promise<void>;
+    deleteUserProfile(id: Principal): Promise<void>;
     getAllEmployeeProfiles(): Promise<Array<EmployeeProfile>>;
     getAllPerformanceRecords(): Promise<Array<PerformanceRecord>>;
+    getAllUserProfiles(): Promise<Array<[Principal, UserProfile]>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getEmployeeProfile(id: Principal): Promise<EmployeeProfile | null>;

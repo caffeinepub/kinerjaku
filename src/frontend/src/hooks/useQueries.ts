@@ -62,7 +62,6 @@ export function useAllUserProfiles() {
     queryKey: ["allUserProfiles"],
     queryFn: async () => {
       if (!actor) return [];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return (actor as any).getAllUserProfiles();
     },
     enabled: !!actor && !isFetching,
@@ -164,6 +163,51 @@ export function useUpdateRecordFeedback() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["allPerformanceRecords"] });
+    },
+  });
+}
+
+export function useDeleteEmployee() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      isUserProfile,
+    }: {
+      id: Principal;
+      isUserProfile: boolean;
+    }) => {
+      if (!actor) throw new Error("Actor not ready");
+      if (isUserProfile) {
+        return (actor as any).deleteUserProfile(id);
+      }
+      return (actor as any).deleteEmployeeProfile(id);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["allEmployeeProfiles"] });
+      qc.invalidateQueries({ queryKey: ["allUserProfiles"] });
+    },
+  });
+}
+
+export function useAdminUpdateUserProfile() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      profile,
+    }: {
+      id: Principal;
+      profile: UserProfile;
+    }) => {
+      if (!actor) throw new Error("Actor not ready");
+      return (actor as any).adminUpdateUserProfile(id, profile);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["allUserProfiles"] });
+      qc.invalidateQueries({ queryKey: ["allEmployeeProfiles"] });
     },
   });
 }

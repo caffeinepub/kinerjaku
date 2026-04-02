@@ -13,7 +13,14 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Loader2, LogOut, RefreshCw, Trash2, Upload } from "lucide-react";
+import {
+  FileDown,
+  Loader2,
+  LogOut,
+  RefreshCw,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
@@ -23,6 +30,7 @@ import {
   useDeletePerformanceRecord,
   usePerformanceRecordsByEmployee,
 } from "../hooks/useQueries";
+import { downloadRecapPdf } from "../utils/pdfRecap";
 
 function getScoreBadge(score: string) {
   if (score === "Baik")
@@ -162,6 +170,26 @@ export default function DashboardPage() {
 
   const triggerFileInput = () => {
     fileRef.current?.click();
+  };
+
+  const handleDownloadPdf = () => {
+    if (!records || records.length === 0) return;
+    downloadRecapPdf({
+      employeeName: profile?.name ?? displayName,
+      nip: profile?.nip ?? "",
+      desa: profile?.desa ?? "",
+      address: profile?.address ?? "",
+      records: records.map((r) => ({
+        date: r.date,
+        task: r.task,
+        target: r.target,
+        realisasi: r.realisasi,
+        percentage: r.percentage,
+        score: r.score,
+        adminRating: r.adminRating ?? undefined,
+        adminFeedback: r.adminFeedback ?? undefined,
+      })),
+    });
   };
 
   return (
@@ -324,16 +352,30 @@ export default function DashboardPage() {
           >
             <div className="bg-primary/5 border-b border-border px-5 py-3 rounded-t-lg flex items-center justify-between">
               <h2 className="font-semibold text-foreground">Data Kinerja</h2>
-              <Button
-                variant="outline"
-                size="sm"
-                data-ocid="dashboard.refresh.button"
-                onClick={() => refetch()}
-                className="text-primary border-primary hover:bg-primary/10"
-              >
-                <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                Refresh
-              </Button>
+              <div className="flex items-center gap-2">
+                {records && records.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    data-ocid="dashboard.download.button"
+                    onClick={handleDownloadPdf}
+                    className="text-primary border-primary hover:bg-primary/10"
+                  >
+                    <FileDown className="h-3.5 w-3.5 mr-1" />
+                    PDF
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-ocid="dashboard.refresh.button"
+                  onClick={() => refetch()}
+                  className="text-primary border-primary hover:bg-primary/10"
+                >
+                  <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                  Refresh
+                </Button>
+              </div>
             </div>
 
             <div className="overflow-auto">

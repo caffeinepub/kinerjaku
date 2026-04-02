@@ -8,6 +8,15 @@
 
 import { IDL } from '@icp-sdk/core/candid';
 
+export const UserProfile = IDL.Record({
+  'nip' : IDL.Text,
+  'latitude' : IDL.Float64,
+  'desa' : IDL.Text,
+  'name' : IDL.Text,
+  'longitude' : IDL.Float64,
+  'kecamatan' : IDL.Text,
+  'address' : IDL.Text,
+});
 export const UserRole = IDL.Variant({
   'admin' : IDL.Null,
   'user' : IDL.Null,
@@ -23,10 +32,12 @@ export const EmployeeProfile = IDL.Record({
   'createdAt' : Time,
   'role' : UserRole,
   'longitude' : IDL.Float64,
+  'kecamatan' : IDL.Text,
   'address' : IDL.Text,
 });
 export const PerformanceRecord = IDL.Record({
   'id' : IDL.Nat,
+  'adminRating' : IDL.Opt(IDL.Text),
   'employeeName' : IDL.Text,
   'realisasi' : IDL.Nat,
   'date' : IDL.Text,
@@ -35,22 +46,14 @@ export const PerformanceRecord = IDL.Record({
   'score' : IDL.Text,
   'target' : IDL.Nat,
   'employeeId' : IDL.Principal,
+  'adminFeedback' : IDL.Opt(IDL.Text),
   'percentage' : IDL.Float64,
   'fileBuktiUrl' : IDL.Opt(IDL.Text),
-  'adminFeedback' : IDL.Opt(IDL.Text),
-  'adminRating' : IDL.Opt(IDL.Text),
-});
-export const UserProfile = IDL.Record({
-  'nip' : IDL.Text,
-  'latitude' : IDL.Float64,
-  'desa' : IDL.Text,
-  'name' : IDL.Text,
-  'longitude' : IDL.Float64,
-  'address' : IDL.Text,
 });
 
 export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+  'adminUpdateUserProfile' : IDL.Func([IDL.Principal, UserProfile], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'createOrUpdateEmployeeProfile' : IDL.Func([EmployeeProfile], [], []),
   'createPerformanceRecord' : IDL.Func(
@@ -69,7 +72,9 @@ export const idlService = IDL.Service({
       [IDL.Nat],
       [],
     ),
+  'deleteEmployeeProfile' : IDL.Func([IDL.Principal], [], []),
   'deletePerformanceRecord' : IDL.Func([IDL.Nat], [], []),
+  'deleteUserProfile' : IDL.Func([IDL.Principal], [], []),
   'getAllEmployeeProfiles' : IDL.Func(
       [],
       [IDL.Vec(EmployeeProfile)],
@@ -104,12 +109,25 @@ export const idlService = IDL.Service({
     ),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
-  'updateRecordFeedback' : IDL.Func([IDL.Nat, IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)], [], []),
+  'updateRecordFeedback' : IDL.Func(
+      [IDL.Nat, IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)],
+      [],
+      [],
+    ),
 });
 
 export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
+  const UserProfile = IDL.Record({
+    'nip' : IDL.Text,
+    'latitude' : IDL.Float64,
+    'desa' : IDL.Text,
+    'name' : IDL.Text,
+    'longitude' : IDL.Float64,
+    'kecamatan' : IDL.Text,
+    'address' : IDL.Text,
+  });
   const UserRole = IDL.Variant({
     'admin' : IDL.Null,
     'user' : IDL.Null,
@@ -125,10 +143,12 @@ export const idlFactory = ({ IDL }) => {
     'createdAt' : Time,
     'role' : UserRole,
     'longitude' : IDL.Float64,
+    'kecamatan' : IDL.Text,
     'address' : IDL.Text,
   });
   const PerformanceRecord = IDL.Record({
     'id' : IDL.Nat,
+    'adminRating' : IDL.Opt(IDL.Text),
     'employeeName' : IDL.Text,
     'realisasi' : IDL.Nat,
     'date' : IDL.Text,
@@ -137,22 +157,14 @@ export const idlFactory = ({ IDL }) => {
     'score' : IDL.Text,
     'target' : IDL.Nat,
     'employeeId' : IDL.Principal,
+    'adminFeedback' : IDL.Opt(IDL.Text),
     'percentage' : IDL.Float64,
     'fileBuktiUrl' : IDL.Opt(IDL.Text),
-    'adminFeedback' : IDL.Opt(IDL.Text),
-    'adminRating' : IDL.Opt(IDL.Text),
-  });
-  const UserProfile = IDL.Record({
-    'nip' : IDL.Text,
-    'latitude' : IDL.Float64,
-    'desa' : IDL.Text,
-    'name' : IDL.Text,
-    'longitude' : IDL.Float64,
-    'address' : IDL.Text,
   });
   
   return IDL.Service({
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+    'adminUpdateUserProfile' : IDL.Func([IDL.Principal, UserProfile], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'createOrUpdateEmployeeProfile' : IDL.Func([EmployeeProfile], [], []),
     'createPerformanceRecord' : IDL.Func(
@@ -171,7 +183,9 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Nat],
         [],
       ),
+    'deleteEmployeeProfile' : IDL.Func([IDL.Principal], [], []),
     'deletePerformanceRecord' : IDL.Func([IDL.Nat], [], []),
+    'deleteUserProfile' : IDL.Func([IDL.Principal], [], []),
     'getAllEmployeeProfiles' : IDL.Func(
         [],
         [IDL.Vec(EmployeeProfile)],
@@ -206,7 +220,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
-    'updateRecordFeedback' : IDL.Func([IDL.Nat, IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)], [], []),
+    'updateRecordFeedback' : IDL.Func(
+        [IDL.Nat, IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)],
+        [],
+        [],
+      ),
   });
 };
 

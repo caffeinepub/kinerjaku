@@ -19,10 +19,12 @@ export interface EmployeeProfile {
   'createdAt' : Time,
   'role' : UserRole,
   'longitude' : number,
+  'kecamatan' : string,
   'address' : string,
 }
 export interface PerformanceRecord {
   'id' : bigint,
+  'adminRating' : [] | [string],
   'employeeName' : string,
   'realisasi' : bigint,
   'date' : string,
@@ -31,10 +33,9 @@ export interface PerformanceRecord {
   'score' : string,
   'target' : bigint,
   'employeeId' : Principal,
+  'adminFeedback' : [] | [string],
   'percentage' : number,
   'fileBuktiUrl' : [] | [string],
-  'adminFeedback' : [] | [string],
-  'adminRating' : [] | [string],
 }
 export type Time = bigint;
 export interface UserProfile {
@@ -43,6 +44,7 @@ export interface UserProfile {
   'desa' : string,
   'name' : string,
   'longitude' : number,
+  'kecamatan' : string,
   'address' : string,
 }
 export type UserRole = { 'admin' : null } |
@@ -50,6 +52,7 @@ export type UserRole = { 'admin' : null } |
   { 'guest' : null };
 export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
+  'adminUpdateUserProfile' : ActorMethod<[Principal, UserProfile], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'createOrUpdateEmployeeProfile' : ActorMethod<[EmployeeProfile], undefined>,
   'createPerformanceRecord' : ActorMethod<
@@ -67,7 +70,9 @@ export interface _SERVICE {
     ],
     bigint
   >,
+  'deleteEmployeeProfile' : ActorMethod<[Principal], undefined>,
   'deletePerformanceRecord' : ActorMethod<[bigint], undefined>,
+  'deleteUserProfile' : ActorMethod<[Principal], undefined>,
   'getAllEmployeeProfiles' : ActorMethod<[], Array<EmployeeProfile>>,
   'getAllPerformanceRecords' : ActorMethod<[], Array<PerformanceRecord>>,
   'getAllUserProfiles' : ActorMethod<[], Array<[Principal, UserProfile]>>,
@@ -81,7 +86,10 @@ export interface _SERVICE {
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
-  'updateRecordFeedback' : ActorMethod<[bigint, [] | [string], [] | [string]], undefined>,
+  'updateRecordFeedback' : ActorMethod<
+    [bigint, [] | [string], [] | [string]],
+    undefined
+  >,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

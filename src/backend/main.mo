@@ -8,7 +8,9 @@ import Principal "mo:core/Principal";
 import Runtime "mo:core/Runtime";
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
+import Migration "migration";
 
+(with migration = Migration.run)
 actor {
   // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -21,6 +23,7 @@ actor {
     latitude : Float;
     longitude : Float;
     address : Text;
+    kecamatan : Text; // field added!!
     createdAt : Time.Time;
   };
 
@@ -61,6 +64,7 @@ actor {
     name : Text;
     nip : Text;
     desa : Text;
+    kecamatan : Text; // field added!!
     latitude : Float;
     longitude : Float;
     address : Text;
@@ -86,7 +90,6 @@ actor {
 
   let employeeProfiles = Map.empty<Principal, EmployeeProfile>();
   let userProfiles = Map.empty<Principal, UserProfile>();
-
   var nextRecordId = 0;
 
   // ── One-time migration on first upgrade ────────────────────────────────────
@@ -273,5 +276,26 @@ actor {
         };
       };
     };
+  };
+
+  public shared ({ caller }) func deleteEmployeeProfile(id : Principal) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admin can delete employee profiles");
+    };
+    employeeProfiles.remove(id);
+  };
+
+  public shared ({ caller }) func deleteUserProfile(id : Principal) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admin can delete user profiles");
+    };
+    userProfiles.remove(id);
+  };
+
+  public shared ({ caller }) func adminUpdateUserProfile(id : Principal, profile : UserProfile) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admin can update user profiles");
+    };
+    userProfiles.add(id, profile);
   };
 };

@@ -91,6 +91,7 @@ export class ExternalBlob {
 }
 export interface PerformanceRecord {
     id: bigint;
+    adminRating?: string;
     employeeName: string;
     realisasi: bigint;
     date: string;
@@ -99,10 +100,9 @@ export interface PerformanceRecord {
     score: string;
     target: bigint;
     employeeId: Principal;
+    adminFeedback?: string;
     percentage: number;
     fileBuktiUrl?: string;
-    adminFeedback?: string;
-    adminRating?: string;
 }
 export interface EmployeeProfile {
     id: Principal;
@@ -113,6 +113,7 @@ export interface EmployeeProfile {
     createdAt: Time;
     role: UserRole;
     longitude: number;
+    kecamatan: string;
     address: string;
 }
 export type Time = bigint;
@@ -122,6 +123,7 @@ export interface UserProfile {
     desa: string;
     name: string;
     longitude: number;
+    kecamatan: string;
     address: string;
 }
 export enum UserRole {
@@ -131,6 +133,7 @@ export enum UserRole {
 }
 export interface backendInterface {
     _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
+    adminUpdateUserProfile(id: Principal, profile: UserProfile): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     createOrUpdateEmployeeProfile(profile: EmployeeProfile): Promise<void>;
     createPerformanceRecord(recordInput: {
@@ -143,9 +146,12 @@ export interface backendInterface {
         employeeId: Principal;
         fileBuktiUrl?: string;
     }): Promise<bigint>;
+    deleteEmployeeProfile(id: Principal): Promise<void>;
     deletePerformanceRecord(recordId: bigint): Promise<void>;
+    deleteUserProfile(id: Principal): Promise<void>;
     getAllEmployeeProfiles(): Promise<Array<EmployeeProfile>>;
     getAllPerformanceRecords(): Promise<Array<PerformanceRecord>>;
+    getAllUserProfiles(): Promise<Array<[Principal, UserProfile]>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getEmployeeProfile(id: Principal): Promise<EmployeeProfile | null>;
@@ -169,6 +175,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor._initializeAccessControlWithSecret(arg0);
+            return result;
+        }
+    }
+    async adminUpdateUserProfile(arg0: Principal, arg1: UserProfile): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.adminUpdateUserProfile(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.adminUpdateUserProfile(arg0, arg1);
             return result;
         }
     }
@@ -223,6 +243,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async deleteEmployeeProfile(arg0: Principal): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteEmployeeProfile(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteEmployeeProfile(arg0);
+            return result;
+        }
+    }
     async deletePerformanceRecord(arg0: bigint): Promise<void> {
         if (this.processError) {
             try {
@@ -234,6 +268,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.deletePerformanceRecord(arg0);
+            return result;
+        }
+    }
+    async deleteUserProfile(arg0: Principal): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteUserProfile(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteUserProfile(arg0);
             return result;
         }
     }
@@ -263,6 +311,20 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.getAllPerformanceRecords();
             return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getAllUserProfiles(): Promise<Array<[Principal, UserProfile]>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAllUserProfiles();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAllUserProfiles();
+            return result;
         }
     }
     async getCallerUserProfile(): Promise<UserProfile | null> {
@@ -364,18 +426,16 @@ export class Backend implements backendInterface {
         }
     }
     async updateRecordFeedback(arg0: bigint, arg1: string | null, arg2: string | null): Promise<void> {
-        const candidArg1 = arg1 != null ? candid_some(arg1) : candid_none();
-        const candidArg2 = arg2 != null ? candid_some(arg2) : candid_none();
         if (this.processError) {
             try {
-                const result = await this.actor.updateRecordFeedback(arg0, candidArg1, candidArg2);
+                const result = await this.actor.updateRecordFeedback(arg0, to_candid_opt_n17(this._uploadFile, this._downloadFile, arg1), to_candid_opt_n17(this._uploadFile, this._downloadFile, arg2));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.updateRecordFeedback(arg0, candidArg1, candidArg2);
+            const result = await this.actor.updateRecordFeedback(arg0, to_candid_opt_n17(this._uploadFile, this._downloadFile, arg1), to_candid_opt_n17(this._uploadFile, this._downloadFile, arg2));
             return result;
         }
     }
@@ -400,6 +460,7 @@ function from_candid_opt_n16(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
 }
 function from_candid_record_n13(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     id: bigint;
+    adminRating: [] | [string];
     employeeName: string;
     realisasi: bigint;
     date: string;
@@ -408,13 +469,27 @@ function from_candid_record_n13(_uploadFile: (file: ExternalBlob) => Promise<Uin
     score: string;
     target: bigint;
     employeeId: Principal;
+    adminFeedback: [] | [string];
     percentage: number;
     fileBuktiUrl: [] | [string];
-    adminFeedback: [] | [string];
-    adminRating: [] | [string];
-}): PerformanceRecord {
+}): {
+    id: bigint;
+    adminRating?: string;
+    employeeName: string;
+    realisasi: bigint;
+    date: string;
+    createdAt: Time;
+    task: string;
+    score: string;
+    target: bigint;
+    employeeId: Principal;
+    adminFeedback?: string;
+    percentage: number;
+    fileBuktiUrl?: string;
+} {
     return {
         id: value.id,
+        adminRating: record_opt_to_undefined(from_candid_opt_n14(_uploadFile, _downloadFile, value.adminRating)),
         employeeName: value.employeeName,
         realisasi: value.realisasi,
         date: value.date,
@@ -423,10 +498,9 @@ function from_candid_record_n13(_uploadFile: (file: ExternalBlob) => Promise<Uin
         score: value.score,
         target: value.target,
         employeeId: value.employeeId,
-        percentage: value.percentage,
-        fileBuktiUrl: record_opt_to_undefined(from_candid_opt_n14(_uploadFile, _downloadFile, value.fileBuktiUrl)),
         adminFeedback: record_opt_to_undefined(from_candid_opt_n14(_uploadFile, _downloadFile, value.adminFeedback)),
-        adminRating: record_opt_to_undefined(from_candid_opt_n14(_uploadFile, _downloadFile, value.adminRating)),
+        percentage: value.percentage,
+        fileBuktiUrl: record_opt_to_undefined(from_candid_opt_n14(_uploadFile, _downloadFile, value.fileBuktiUrl))
     };
 }
 function from_candid_record_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
@@ -438,6 +512,7 @@ function from_candid_record_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint
     createdAt: _Time;
     role: _UserRole;
     longitude: number;
+    kecamatan: string;
     address: string;
 }): {
     id: Principal;
@@ -448,6 +523,7 @@ function from_candid_record_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint
     createdAt: Time;
     role: UserRole;
     longitude: number;
+    kecamatan: string;
     address: string;
 } {
     return {
@@ -459,6 +535,7 @@ function from_candid_record_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint
         createdAt: value.createdAt,
         role: from_candid_UserRole_n9(_uploadFile, _downloadFile, value.role),
         longitude: value.longitude,
+        kecamatan: value.kecamatan,
         address: value.address
     };
 }
@@ -483,6 +560,9 @@ function to_candid_EmployeeProfile_n3(_uploadFile: (file: ExternalBlob) => Promi
 function to_candid_UserRole_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole): _UserRole {
     return to_candid_variant_n2(_uploadFile, _downloadFile, value);
 }
+function to_candid_opt_n17(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: string | null): [] | [string] {
+    return value === null ? candid_none() : candid_some(value);
+}
 function to_candid_record_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     id: Principal;
     nip: string;
@@ -492,6 +572,7 @@ function to_candid_record_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
     createdAt: Time;
     role: UserRole;
     longitude: number;
+    kecamatan: string;
     address: string;
 }): {
     id: Principal;
@@ -502,6 +583,7 @@ function to_candid_record_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
     createdAt: _Time;
     role: _UserRole;
     longitude: number;
+    kecamatan: string;
     address: string;
 } {
     return {
@@ -513,6 +595,7 @@ function to_candid_record_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
         createdAt: value.createdAt,
         role: to_candid_UserRole_n1(_uploadFile, _downloadFile, value.role),
         longitude: value.longitude,
+        kecamatan: value.kecamatan,
         address: value.address
     };
 }
