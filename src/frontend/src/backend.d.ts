@@ -19,6 +19,8 @@ export interface PerformanceRecord {
     employeeId: Principal;
     percentage: number;
     fileBuktiUrl?: string;
+    adminFeedback?: string;
+    adminRating?: string;
 }
 export interface EmployeeProfile {
     id: Principal;
@@ -68,4 +70,5 @@ export interface backendInterface {
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    updateRecordFeedback(recordId: bigint, adminFeedback: string | null, adminRating: string | null): Promise<void>;
 }

@@ -146,5 +146,27 @@ export function useDeletePerformanceRecord() {
   });
 }
 
+export function useUpdateRecordFeedback() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      recordId: bigint;
+      adminFeedback: string | null;
+      adminRating: string | null;
+    }) => {
+      if (!actor) throw new Error("Actor not ready");
+      return actor.updateRecordFeedback(
+        input.recordId,
+        input.adminFeedback,
+        input.adminRating,
+      );
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["allPerformanceRecords"] });
+    },
+  });
+}
+
 export { UserRole };
 export type { UserProfile, EmployeeProfile, PerformanceRecord };

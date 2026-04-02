@@ -12,10 +12,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
   BarChart2,
+  ChevronDown,
+  ChevronRight,
+  ClipboardList,
   LayoutDashboard,
   Loader2,
   LogOut,
   MapPin,
+  Save,
   Users,
 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -27,10 +31,11 @@ import {
   useAllPerformanceRecords,
   useAllUserProfiles,
   useIsCallerAdmin,
+  useUpdateRecordFeedback,
 } from "../hooks/useQueries";
-import type { EmployeeProfile } from "../hooks/useQueries";
+import type { EmployeeProfile, PerformanceRecord } from "../hooks/useQueries";
 
-type AdminTab = "dashboard" | "pegawai" | "kinerja" | "peta";
+type AdminTab = "dashboard" | "pegawai" | "kinerja" | "rekap" | "peta";
 
 function StatCard({
   label,
@@ -63,6 +68,248 @@ function getScoreBadge(score: string) {
     <Badge className="bg-destructive text-destructive-foreground">
       {score}
     </Badge>
+  );
+}
+
+function getRatingBadge(rating: string) {
+  const colors: Record<string, string> = {
+    "Sangat Baik": "bg-[oklch(0.6_0.2_145)] text-white",
+    Baik: "bg-[oklch(0.65_0.18_145)] text-white",
+    Cukup: "bg-[oklch(0.7_0.19_55)] text-white",
+    "Perlu Perbaikan": "bg-destructive text-destructive-foreground",
+  };
+  return (
+    <Badge className={colors[rating] ?? "bg-muted text-muted-foreground"}>
+      {rating}
+    </Badge>
+  );
+}
+
+type EmployeeRecap = {
+  employeeId: string;
+  employeeName: string;
+  totalTasks: number;
+  avgPercentage: number;
+  dominantScore: string;
+  latestRating: string;
+  latestFeedback: string;
+  records: PerformanceRecord[];
+};
+
+function RekapPegawai({ records }: { records: PerformanceRecord[] }) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [feedbackState, setFeedbackState] = useState<
+    Record<string, { rating: string; feedback: string }>
+  >({});
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const updateFeedback = useUpdateRecordFeedback();
+
+  const recaps = useMemo<EmployeeRecap[]>(() => {
+    const map = new Map<string, PerformanceRecord[]>();
+    for (const r of records) {
+      const key = r.employeeId.toString();
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(r);
+    }
+    return Array.from(map.entries()).map(([id, recs]) => {
+      const avgPercentage =
+        recs.reduce((s, r) => s + r.percentage, 0) / recs.length;
+      // Dominant score
+      const scoreCount: Record<string, number> = {};
+      for (const r of recs)
+        scoreCount[r.score] = (scoreCount[r.score] ?? 0) + 1;
+      const dominantScore = Object.entries(scoreCount).sort(
+        (a, b) => b[1] - a[1],
+      )[0][0];
+      // Latest feedback/rating
+      const sorted = [...recs].sort(
+        (a, b) => Number(b.createdAt) - Number(a.createdAt),
+      );
+      return {
+        employeeId: id,
+        employeeName: recs[0].employeeName,
+        totalTasks: recs.length,
+        avgPercentage,
+        dominantScore,
+        latestRating: sorted[0]?.adminRating ?? "",
+        latestFeedback: sorted[0]?.adminFeedback ?? "",
+        records: recs,
+      };
+    });
+  }, [records]);
+
+  const handleSaveFeedback = async (rec: PerformanceRecord) => {
+    const key = rec.id.toString();
+    const fb = feedbackState[key];
+    if (!fb) return;
+    setSavingId(key);
+    try {
+      await updateFeedback.mutateAsync({
+        recordId: rec.id,
+        adminFeedback: fb.feedback || null,
+        adminRating: fb.rating || null,
+      });
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  if (recaps.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground py-8 text-center">
+        Belum ada data kinerja
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {recaps.map((recap) => (
+        <div
+          key={recap.employeeId}
+          className="bg-white rounded-lg border border-border shadow-sm overflow-hidden"
+        >
+          {/* Rekap header */}
+          <button
+            type="button"
+            className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/20 transition-colors"
+            onClick={() =>
+              setExpandedId(
+                expandedId === recap.employeeId ? null : recap.employeeId,
+              )
+            }
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <span className="font-bold text-primary text-sm">
+                  {recap.employeeName.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-foreground text-sm">
+                  {recap.employeeName}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {recap.totalTasks} tugas &bull; rata-rata{" "}
+                  {recap.avgPercentage.toFixed(1)}%
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {getScoreBadge(recap.dominantScore)}
+              {recap.latestRating && getRatingBadge(recap.latestRating)}
+              {expandedId === recap.employeeId ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              )}
+            </div>
+          </button>
+
+          {/* Expanded detail */}
+          {expandedId === recap.employeeId && (
+            <div className="border-t border-border">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/30">
+                      <TableHead className="text-xs">Tanggal</TableHead>
+                      <TableHead className="text-xs">Tugas</TableHead>
+                      <TableHead className="text-xs">Target</TableHead>
+                      <TableHead className="text-xs">Realisasi</TableHead>
+                      <TableHead className="text-xs">%</TableHead>
+                      <TableHead className="text-xs">Nilai</TableHead>
+                      <TableHead className="text-xs min-w-[140px]">
+                        Rating Admin
+                      </TableHead>
+                      <TableHead className="text-xs min-w-[200px]">
+                        Feedback Admin
+                      </TableHead>
+                      <TableHead className="text-xs">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {recap.records.map((rec) => {
+                      const key = rec.id.toString();
+                      const fb = feedbackState[key] ?? {
+                        rating: rec.adminRating ?? "",
+                        feedback: rec.adminFeedback ?? "",
+                      };
+                      return (
+                        <TableRow key={key}>
+                          <TableCell className="text-xs">{rec.date}</TableCell>
+                          <TableCell className="text-xs max-w-[120px] truncate">
+                            {rec.task}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {rec.target.toString()}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {rec.realisasi.toString()}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {rec.percentage.toFixed(1)}%
+                          </TableCell>
+                          <TableCell>{getScoreBadge(rec.score)}</TableCell>
+                          <TableCell>
+                            <select
+                              className="text-xs border border-border rounded px-2 py-1 bg-white w-full"
+                              value={fb.rating}
+                              onChange={(e) =>
+                                setFeedbackState((prev) => ({
+                                  ...prev,
+                                  [key]: { ...fb, rating: e.target.value },
+                                }))
+                              }
+                            >
+                              <option value="">-- Pilih --</option>
+                              <option>Sangat Baik</option>
+                              <option>Baik</option>
+                              <option>Cukup</option>
+                              <option>Perlu Perbaikan</option>
+                            </select>
+                          </TableCell>
+                          <TableCell>
+                            <textarea
+                              className="text-xs border border-border rounded px-2 py-1 bg-white w-full resize-none"
+                              rows={2}
+                              placeholder="Tulis feedback..."
+                              value={fb.feedback}
+                              onChange={(e) =>
+                                setFeedbackState((prev) => ({
+                                  ...prev,
+                                  [key]: { ...fb, feedback: e.target.value },
+                                }))
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs h-7 px-2"
+                              disabled={savingId === key}
+                              onClick={() => handleSaveFeedback(rec)}
+                            >
+                              {savingId === key ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Save className="h-3 w-3" />
+                              )}
+                              <span className="ml-1">Simpan</span>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -149,6 +396,11 @@ export default function AdminPage() {
       label: "Data Kinerja",
       icon: <BarChart2 className="h-4 w-4" />,
     },
+    {
+      id: "rekap",
+      label: "Rekap & Penilaian",
+      icon: <ClipboardList className="h-4 w-4" />,
+    },
     { id: "peta", label: "Peta Lokasi", icon: <MapPin className="h-4 w-4" /> },
   ];
 
@@ -222,7 +474,7 @@ export default function AdminPage() {
               }`}
             >
               {item.icon}
-              <span>{item.label}</span>
+              <span className="hidden sm:block">{item.label}</span>
             </button>
           ))}
         </div>
@@ -413,6 +665,9 @@ export default function AdminPage() {
                         <TableHead className="text-xs font-semibold">
                           Nilai
                         </TableHead>
+                        <TableHead className="text-xs font-semibold">
+                          Rating Admin
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -441,6 +696,15 @@ export default function AdminPage() {
                             {rec.percentage.toFixed(1)}%
                           </TableCell>
                           <TableCell>{getScoreBadge(rec.score)}</TableCell>
+                          <TableCell>
+                            {rec.adminRating ? (
+                              getRatingBadge(rec.adminRating)
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                -
+                              </span>
+                            )}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -454,6 +718,26 @@ export default function AdminPage() {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Rekap & Penilaian Tab */}
+          {activeTab === "rekap" && (
+            <div data-ocid="admin.rekap.section">
+              <h1 className="text-lg font-bold text-foreground mb-2">
+                Rekap & Penilaian Per Pegawai
+              </h1>
+              <p className="text-sm text-muted-foreground mb-5">
+                Klik nama pegawai untuk melihat detail dan mengisi penilaian
+                serta feedback.
+              </p>
+              {recLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : (
+                <RekapPegawai records={records ?? []} />
+              )}
             </div>
           )}
 

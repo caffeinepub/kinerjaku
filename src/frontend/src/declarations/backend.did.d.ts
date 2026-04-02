@@ -33,6 +33,8 @@ export interface PerformanceRecord {
   'employeeId' : Principal,
   'percentage' : number,
   'fileBuktiUrl' : [] | [string],
+  'adminFeedback' : [] | [string],
+  'adminRating' : [] | [string],
 }
 export type Time = bigint;
 export interface UserProfile {
@@ -79,6 +81,7 @@ export interface _SERVICE {
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
+  'updateRecordFeedback' : ActorMethod<[bigint, [] | [string], [] | [string]], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

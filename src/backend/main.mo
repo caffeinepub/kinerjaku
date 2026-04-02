@@ -10,7 +10,8 @@ import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 
 actor {
-  // Types
+  // ── Types ──────────────────────────────────────────────────────────────────
+
   type EmployeeProfile = {
     id : Principal;
     name : Text;
@@ -23,6 +24,23 @@ actor {
     createdAt : Time.Time;
   };
 
+  // V1 type (original, no feedback fields) — kept so Motoko can deserialise
+  // the existing stable data stored under the name `performanceRecords`.
+  type PerformanceRecordV1 = {
+    id : Nat;
+    employeeId : Principal;
+    employeeName : Text;
+    task : Text;
+    target : Nat;
+    realisasi : Nat;
+    percentage : Float;
+    score : Text;
+    date : Text;
+    fileBuktiUrl : ?Text;
+    createdAt : Time.Time;
+  };
+
+  // V2 type — adds admin feedback fields.
   type PerformanceRecord = {
     id : Nat;
     employeeId : Principal;
@@ -35,6 +53,8 @@ actor {
     date : Text;
     fileBuktiUrl : ?Text;
     createdAt : Time.Time;
+    adminFeedback : ?Text;
+    adminRating : ?Text;
   };
 
   public type UserProfile = {
@@ -52,17 +72,56 @@ actor {
     };
   };
 
-  // State
+  // ── Stable state ───────────────────────────────────────────────────────────
+
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
-  let performanceRecords = Map.empty<Nat, PerformanceRecord>();
+  // Keep original name + original type so the old stable data is deserialised
+  // here rather than discarded.  After migration this map is no longer written.
+  let performanceRecords = Map.empty<Nat, PerformanceRecordV1>();
+
+  // New stable map that carries the V2 type.
+  let performanceRecordsV2 = Map.empty<Nat, PerformanceRecord>();
+
   let employeeProfiles = Map.empty<Principal, EmployeeProfile>();
   let userProfiles = Map.empty<Principal, UserProfile>();
 
   var nextRecordId = 0;
 
-  // User Profile Functions (required by frontend)
+  // ── One-time migration on first upgrade ────────────────────────────────────
+  //
+  // `postupgrade` runs after every upgrade.  The guard (size check) ensures
+  // we only copy V1 records into V2 once — subsequent upgrades skip this block
+  // because performanceRecordsV2 will already be populated.
+
+  system func postupgrade() {
+    if (performanceRecordsV2.size() == 0 and performanceRecords.size() > 0) {
+      for ((id, rec) in performanceRecords.entries()) {
+        performanceRecordsV2.add(
+          id,
+          {
+            id = rec.id;
+            employeeId = rec.employeeId;
+            employeeName = rec.employeeName;
+            task = rec.task;
+            target = rec.target;
+            realisasi = rec.realisasi;
+            percentage = rec.percentage;
+            score = rec.score;
+            date = rec.date;
+            fileBuktiUrl = rec.fileBuktiUrl;
+            createdAt = rec.createdAt;
+            adminFeedback = null;
+            adminRating = null;
+          },
+        );
+      };
+    };
+  };
+
+  // ── User Profile functions ─────────────────────────────────────────────────
+
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can access profiles");
@@ -84,37 +143,29 @@ actor {
     userProfiles.add(caller, profile);
   };
 
-  // Employee Profile Functions
+  // ── Employee Profile functions ─────────────────────────────────────────────
+
   public shared ({ caller }) func createOrUpdateEmployeeProfile(profile : EmployeeProfile) : async () {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("Unauthorized: Only admins can create or update employee profiles");
     };
-
-    let updatedProfile : EmployeeProfile = {
-      profile with
-      createdAt = Time.now();
-    };
-    employeeProfiles.add(profile.id, updatedProfile);
+    employeeProfiles.add(profile.id, { profile with createdAt = Time.now() });
   };
 
   public query ({ caller }) func getEmployeeProfile(id : Principal) : async ?EmployeeProfile {
     let callerRole = AccessControl.getUserRole(accessControlState, caller);
-
     switch (employeeProfiles.get(id)) {
       case (null) { null };
       case (?profile) {
-        if (
-          (callerRole == #admin) or (caller == id)
-        ) {
-          ?profile;
-        } else {
+        if ((callerRole == #admin) or (caller == id)) { ?profile } else {
           Runtime.trap("Unauthorized to view this profile");
         };
       };
     };
   };
 
-  // Performance Record Functions
+  // ── Performance Record functions ───────────────────────────────────────────
+
   public shared ({ caller }) func createPerformanceRecord(recordInput : {
     employeeId : Principal;
     employeeName : Text;
@@ -125,23 +176,17 @@ actor {
     date : Text;
     fileBuktiUrl : ?Text;
   }) : async Nat {
-    // Authorization: Only the employee themselves or an admin can create performance records
     let callerRole = AccessControl.getUserRole(accessControlState, caller);
     if (not (callerRole == #admin or caller == recordInput.employeeId)) {
       Runtime.trap("Unauthorized: Employees can only create their own performance records");
     };
 
-    // Check if employee has a user profile (registered via self-registration)
-    // OR an employee profile (registered by admin)
     let hasUserProfile = switch (userProfiles.get(recordInput.employeeId)) {
-      case (null) { false };
-      case (?_) { true };
+      case (null) { false }; case (?_) { true };
     };
     let hasEmployeeProfile = switch (employeeProfiles.get(recordInput.employeeId)) {
-      case (null) { false };
-      case (?_) { true };
+      case (null) { false }; case (?_) { true };
     };
-
     if (not (hasUserProfile or hasEmployeeProfile)) {
       Runtime.trap("Profil pegawai tidak ditemukan. Silakan lengkapi profil terlebih dahulu.");
     };
@@ -155,21 +200,41 @@ actor {
       id = nextRecordId;
       percentage;
       createdAt = Time.now();
+      adminFeedback = null;
+      adminRating = null;
     };
 
-    performanceRecords.add(nextRecordId, newRecord);
+    performanceRecordsV2.add(nextRecordId, newRecord);
     nextRecordId += 1;
     newRecord.id;
   };
 
-  public query ({ caller }) func getPerformanceRecordsByEmployee(employeeId : Principal) : async [PerformanceRecord] {
-    let callerRole = AccessControl.getUserRole(accessControlState, caller);
+  public shared ({ caller }) func updateRecordFeedback(
+    recordId : Nat,
+    adminFeedback : ?Text,
+    adminRating : ?Text,
+  ) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admin can provide feedback");
+    };
+    switch (performanceRecordsV2.get(recordId)) {
+      case (null) { Runtime.trap("Record not found") };
+      case (?record) {
+        performanceRecordsV2.add(recordId, { record with adminFeedback; adminRating });
+      };
+    };
+  };
 
-    if (
-      (callerRole == #admin) or (caller == employeeId)
-    ) {
-      let records = performanceRecords.values().toArray().sort(PerformanceRecord.compareById);
-      records.filter(func(record) { record.employeeId == employeeId });
+  public query ({ caller }) func getPerformanceRecordsByEmployee(
+    employeeId : Principal
+  ) : async [PerformanceRecord] {
+    let callerRole = AccessControl.getUserRole(accessControlState, caller);
+    if ((callerRole == #admin) or (caller == employeeId)) {
+      performanceRecordsV2
+        .values()
+        .toArray()
+        .sort(PerformanceRecord.compareById)
+        .filter(func(r) { r.employeeId == employeeId });
     } else {
       Runtime.trap("Unauthorized to view these records");
     };
@@ -179,10 +244,9 @@ actor {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("Unauthorized: Only admin can view all records");
     };
-    performanceRecords.values().toArray().sort(PerformanceRecord.compareById);
+    performanceRecordsV2.values().toArray().sort(PerformanceRecord.compareById);
   };
 
-  // Get all employee profiles (admin only)
   public query ({ caller }) func getAllEmployeeProfiles() : async [EmployeeProfile] {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("Unauthorized: Only admin can view all employee profiles");
@@ -190,7 +254,6 @@ actor {
     employeeProfiles.values().toArray();
   };
 
-  // Get all user profiles for map (admin only)
   public query ({ caller }) func getAllUserProfiles() : async [(Principal, UserProfile)] {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("Unauthorized: Only admin can view all user profiles");
@@ -198,21 +261,17 @@ actor {
     userProfiles.entries().toArray();
   };
 
-  // Delete Performance Record (admin or owner)
   public shared ({ caller }) func deletePerformanceRecord(recordId : Nat) : async () {
-    switch (performanceRecords.get(recordId)) {
+    switch (performanceRecordsV2.get(recordId)) {
       case (null) { Runtime.trap("Record not found") };
       case (?record) {
         let callerRole = AccessControl.getUserRole(accessControlState, caller);
-        if (
-          (callerRole == #admin) or (caller == record.employeeId)
-        ) {
-          performanceRecords.remove(recordId);
+        if ((callerRole == #admin) or (caller == record.employeeId)) {
+          performanceRecordsV2.remove(recordId);
         } else {
           Runtime.trap("Unauthorized to delete this record");
         };
       };
     };
   };
-
 };

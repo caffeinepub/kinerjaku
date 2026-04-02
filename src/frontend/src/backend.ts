@@ -101,6 +101,8 @@ export interface PerformanceRecord {
     employeeId: Principal;
     percentage: number;
     fileBuktiUrl?: string;
+    adminFeedback?: string;
+    adminRating?: string;
 }
 export interface EmployeeProfile {
     id: Principal;
@@ -151,6 +153,7 @@ export interface backendInterface {
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    updateRecordFeedback(recordId: bigint, adminFeedback: string | null, adminRating: string | null): Promise<void>;
 }
 import type { EmployeeProfile as _EmployeeProfile, PerformanceRecord as _PerformanceRecord, Time as _Time, UserProfile as _UserProfile, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
@@ -360,6 +363,22 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async updateRecordFeedback(arg0: bigint, arg1: string | null, arg2: string | null): Promise<void> {
+        const candidArg1 = arg1 != null ? candid_some(arg1) : candid_none();
+        const candidArg2 = arg2 != null ? candid_some(arg2) : candid_none();
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateRecordFeedback(arg0, candidArg1, candidArg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateRecordFeedback(arg0, candidArg1, candidArg2);
+            return result;
+        }
+    }
 }
 function from_candid_EmployeeProfile_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _EmployeeProfile): EmployeeProfile {
     return from_candid_record_n8(_uploadFile, _downloadFile, value);
@@ -391,19 +410,9 @@ function from_candid_record_n13(_uploadFile: (file: ExternalBlob) => Promise<Uin
     employeeId: Principal;
     percentage: number;
     fileBuktiUrl: [] | [string];
-}): {
-    id: bigint;
-    employeeName: string;
-    realisasi: bigint;
-    date: string;
-    createdAt: Time;
-    task: string;
-    score: string;
-    target: bigint;
-    employeeId: Principal;
-    percentage: number;
-    fileBuktiUrl?: string;
-} {
+    adminFeedback: [] | [string];
+    adminRating: [] | [string];
+}): PerformanceRecord {
     return {
         id: value.id,
         employeeName: value.employeeName,
@@ -415,7 +424,9 @@ function from_candid_record_n13(_uploadFile: (file: ExternalBlob) => Promise<Uin
         target: value.target,
         employeeId: value.employeeId,
         percentage: value.percentage,
-        fileBuktiUrl: record_opt_to_undefined(from_candid_opt_n14(_uploadFile, _downloadFile, value.fileBuktiUrl))
+        fileBuktiUrl: record_opt_to_undefined(from_candid_opt_n14(_uploadFile, _downloadFile, value.fileBuktiUrl)),
+        adminFeedback: record_opt_to_undefined(from_candid_opt_n14(_uploadFile, _downloadFile, value.adminFeedback)),
+        adminRating: record_opt_to_undefined(from_candid_opt_n14(_uploadFile, _downloadFile, value.adminRating)),
     };
 }
 function from_candid_record_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {

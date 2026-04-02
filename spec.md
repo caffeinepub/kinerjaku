@@ -1,30 +1,31 @@
-# KinerjaKu - Employee Performance Dashboard
+# KinerjaKu
 
 ## Current State
-New project with no existing application files.
+Aplikasi dashboard kinerja pegawai dengan:
+- Backend: PerformanceRecord (id, employeeId, employeeName, task, target, realisasi, percentage, score, date, fileBuktiUrl, createdAt)
+- Admin panel dengan tab: Dashboard, Data Pegawai, Data Kinerja, Peta Lokasi
+- Pegawai dapat input data kinerja sendiri
 
 ## Requested Changes (Diff)
 
 ### Add
-- Login page (frontend) for admin and employee roles
-- Employee registration form with: name, NIP, role, village/desa, address, photo
-- Dashboard layout matching the uploaded image (blue header, two-panel layout)
-- Input Realisasi form: Nama Pegawai, Tugas/Indikator, Target, Realisasi, File Bukti
-- Data Kinerja table: Tgl & Nama, Tugas, Persentase, Nilai, Aksi columns
-- Peta Lokasi Pegawai: interactive map using Leaflet showing employee pins by village/desa
-- Admin dashboard: manage employees, view all performance data, map overview
-- Employee dashboard: input own performance, view own history
+- Field `adminFeedback: ?Text` dan `adminRating: ?Text` di PerformanceRecord (backend)
+- Fungsi `updateRecordFeedback(recordId, adminFeedback, adminRating)` di backend (admin only)
+- Tab baru "Rekap Pegawai" di AdminPage (frontend)
+  - Rekap per pegawai: nama, total tugas, rata-rata persentase, nilai terbanyak
+  - Expand per pegawai untuk lihat semua data kinerja
+  - Kolom Feedback & Rating admin di tabel kinerja (form inline)
+- Fungsi `getEmployeeRecapWithFeedback` di frontend untuk agregasi data per pegawai
 
 ### Modify
-- N/A (new project)
+- backend.d.ts: tambah field adminFeedback/adminRating di PerformanceRecord interface, tambah updateRecordFeedback
+- AdminPage: tambah tab "rekap" di navItems, tambah komponen RekapPegawai
 
 ### Remove
-- N/A
+- Tidak ada
 
 ## Implementation Plan
-1. Backend: Employee profile storage (name, NIP, role, village, lat/lng), Performance records (task, target, realisasi, percentage, nilai, date, file), Role-based access (admin/employee)
-2. Frontend login page with role selection
-3. Employee registration page with village/desa field (geocoded to lat/lng)
-4. Admin dashboard: employee list, performance overview, map with pins per village
-5. Employee dashboard: performance input form, own data table
-6. Leaflet map component showing employee locations by village
+1. Update main.mo: tambah field adminFeedback & adminRating optional di PerformanceRecord, fungsi updateRecordFeedback (admin only)
+2. Update backend.d.ts sesuai perubahan
+3. Update useQueries.ts: tambah hook useUpdateRecordFeedback
+4. Update AdminPage.tsx: tambah tab Rekap dengan tabel rekap per pegawai + inline feedback form
