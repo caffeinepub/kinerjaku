@@ -166,9 +166,11 @@ export default function DashboardPage() {
           agent,
         );
         const arrayBuffer = await file.arrayBuffer();
+        // Pass filename so StorageClient can detect the correct MIME type
         const { hash } = await storageClient.putFile(
           new Uint8Array(arrayBuffer),
           (pct) => setUploadProgress(pct),
+          file.name,
         );
         fileUrl = await storageClient.getDirectURL(hash);
       }
