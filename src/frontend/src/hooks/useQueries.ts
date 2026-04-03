@@ -116,9 +116,19 @@ export function useCreatePerformanceRecord() {
       score: string;
       target: bigint;
       employeeId: Principal;
+      fileBuktiUrl?: string | null;
     }) => {
       const actor = await waitForActor();
-      return actor.createPerformanceRecord(input);
+      return actor.createPerformanceRecord({
+        employeeName: input.employeeName,
+        realisasi: input.realisasi,
+        date: input.date,
+        task: input.task,
+        score: input.score,
+        target: input.target,
+        employeeId: input.employeeId,
+        fileBuktiUrl: input.fileBuktiUrl ?? undefined,
+      });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["performanceRecords"] });

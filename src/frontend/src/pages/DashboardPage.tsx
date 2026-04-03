@@ -13,7 +13,15 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { FileDown, Loader2, LogOut, RefreshCw, Trash2 } from "lucide-react";
+import {
+  ExternalLink,
+  FileDown,
+  Link2,
+  Loader2,
+  LogOut,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { clearActorCache } from "../hooks/useActor";
@@ -42,6 +50,15 @@ function getScoreBadge(score: string) {
   );
 }
 
+function isValidUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" || parsed.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { identity, clear } = useInternetIdentity();
@@ -62,6 +79,7 @@ export default function DashboardPage() {
     tugas: "",
     target: "",
     realisasi: "",
+    lampiranUrl: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -102,6 +120,14 @@ export default function DashboardPage() {
       return;
     }
 
+    // Validasi URL lampiran jika diisi
+    if (form.lampiranUrl.trim() && !isValidUrl(form.lampiranUrl.trim())) {
+      toast.error(
+        "Link lampiran tidak valid. Pastikan diawali dengan https:// atau http://",
+      );
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const percentage = (realisasiNum / targetNum) * 100;
@@ -117,10 +143,17 @@ export default function DashboardPage() {
         score,
         date: today,
         employeeId: identity.getPrincipal(),
+        fileBuktiUrl: form.lampiranUrl.trim() || null,
       });
 
       toast.success("Data kinerja berhasil disimpan!");
-      setForm((prev) => ({ ...prev, tugas: "", target: "", realisasi: "" }));
+      setForm((prev) => ({
+        ...prev,
+        tugas: "",
+        target: "",
+        realisasi: "",
+        lampiranUrl: "",
+      }));
       refetch();
     } catch (err) {
       toast.error(`Gagal menyimpan: ${String(err)}`);
@@ -277,6 +310,36 @@ export default function DashboardPage() {
                 </div>
               </div>
 
+              {/* Lampiran Google Drive */}
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="lampiranUrl"
+                  className="flex items-center gap-1.5"
+                >
+                  <Link2 className="h-3.5 w-3.5 text-muted-foreground" />
+                  Lampiran (Link Google Drive)
+                  <span className="text-muted-foreground text-xs font-normal ml-1">
+                    — opsional
+                  </span>
+                </Label>
+                <Input
+                  id="lampiranUrl"
+                  type="url"
+                  data-ocid="performance.lampiran.input"
+                  value={form.lampiranUrl}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, lampiranUrl: e.target.value }))
+                  }
+                  placeholder="https://drive.google.com/..."
+                />
+                {form.lampiranUrl.trim() &&
+                  !isValidUrl(form.lampiranUrl.trim()) && (
+                    <p className="text-xs text-destructive">
+                      Link tidak valid. Harus diawali https://
+                    </p>
+                  )}
+              </div>
+
               <Button
                 type="submit"
                 data-ocid="performance.submit_button"
@@ -366,6 +429,9 @@ export default function DashboardPage() {
                         Nilai
                       </TableHead>
                       <TableHead className="text-xs font-semibold">
+                        Lampiran
+                      </TableHead>
+                      <TableHead className="text-xs font-semibold">
                         Aksi
                       </TableHead>
                     </TableRow>
@@ -390,6 +456,23 @@ export default function DashboardPage() {
                           {rec.percentage.toFixed(1)}%
                         </TableCell>
                         <TableCell>{getScoreBadge(rec.score)}</TableCell>
+                        <TableCell>
+                          {rec.fileBuktiUrl ? (
+                            <a
+                              href={rec.fileBuktiUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                              Lihat
+                            </a>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              —
+                            </span>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Button
                             variant="ghost"

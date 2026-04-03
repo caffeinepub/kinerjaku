@@ -7,25 +7,36 @@ import { useInternetIdentity } from "./useInternetIdentity";
 
 const ACTOR_QUERY_KEY = "actor";
 
-let _actorInstance: backendInterface | null = null;
+// Global actor cache for waitForActor
+let _cachedActor: backendInterface | null = null;
 let _actorResolvers: Array<(actor: backendInterface) => void> = [];
 
+export function resolveActorCache(actor: backendInterface) {
+  _cachedActor = actor;
+  for (const resolve of _actorResolvers) {
+    resolve(actor);
+  }
+  _actorResolvers = [];
+}
+
+export function clearActorCache() {
+  _cachedActor = null;
+  _actorResolvers = [];
+}
+
 export function waitForActor(): Promise<backendInterface> {
-  if (_actorInstance) return Promise.resolve(_actorInstance);
+  if (_cachedActor) {
+    return Promise.resolve(_cachedActor);
+  }
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
-      reject(new Error("Actor initialization timeout"));
+      reject(new Error("Actor not ready: timeout after 15 seconds"));
     }, 15000);
     _actorResolvers.push((actor) => {
       clearTimeout(timeout);
       resolve(actor);
     });
   });
-}
-
-export function clearActorCache() {
-  _actorInstance = null;
-  _actorResolvers = [];
 }
 
 export function useActor() {
@@ -37,8 +48,9 @@ export function useActor() {
       const isAuthenticated = !!identity;
 
       if (!isAuthenticated) {
-        // Return anonymous actor if not authenticated
-        return await createActorWithConfig();
+        const actor = await createActorWithConfig();
+        resolveActorCache(actor);
+        return actor;
       }
 
       const actorOptions = {
@@ -50,25 +62,17 @@ export function useActor() {
       const actor = await createActorWithConfig(actorOptions);
       const adminToken = getSecretParameter("caffeineAdminToken") || "";
       await actor._initializeAccessControlWithSecret(adminToken);
-
-      // Resolve any pending waitForActor calls
-      _actorInstance = actor;
-      for (const resolve of _actorResolvers) {
-        resolve(actor);
-      }
-      _actorResolvers = [];
-
+      resolveActorCache(actor);
       return actor;
     },
-    // Only refetch when identity changes
     staleTime: Number.POSITIVE_INFINITY,
-    // This will cause the actor to be recreated when the identity changes
     enabled: true,
   });
 
   // When the actor changes, invalidate dependent queries
   useEffect(() => {
     if (actorQuery.data) {
+      resolveActorCache(actorQuery.data);
       queryClient.invalidateQueries({
         predicate: (query) => {
           return !query.queryKey.includes(ACTOR_QUERY_KEY);

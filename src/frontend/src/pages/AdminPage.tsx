@@ -34,6 +34,7 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardList,
+  ExternalLink,
   FileDown,
   LayoutDashboard,
   Loader2,
@@ -916,6 +917,9 @@ export default function AdminPage() {
                         <TableHead className="text-xs font-semibold">
                           Rating Admin
                         </TableHead>
+                        <TableHead className="text-xs font-semibold">
+                          Lampiran
+                        </TableHead>
                         <TableHead className="text-xs font-semibold text-center">
                           Aksi
                         </TableHead>
@@ -953,6 +957,23 @@ export default function AdminPage() {
                             ) : (
                               <span className="text-xs text-muted-foreground">
                                 -
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {rec.fileBuktiUrl ? (
+                              <a
+                                href={rec.fileBuktiUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                Lihat
+                              </a>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                —
                               </span>
                             )}
                           </TableCell>

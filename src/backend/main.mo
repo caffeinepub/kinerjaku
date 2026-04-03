@@ -40,7 +40,7 @@ actor {
     createdAt : Time.Time;
   };
 
-  // V2: includes adminFeedback/adminRating and fileBuktiUrl (kept for stable compat)
+  // V2: includes adminFeedback/adminRating and fileBuktiUrl
   type PerformanceRecord = {
     id : Nat;
     employeeId : Principal;
@@ -166,6 +166,7 @@ actor {
     realisasi : Nat;
     score : Text;
     date : Text;
+    fileBuktiUrl : ?Text;
   }) : async Nat {
     let callerRole = AccessControl.getUserRole(accessControlState, caller);
     if (not (callerRole == #admin or caller == recordInput.employeeId)) {
@@ -195,7 +196,7 @@ actor {
       realisasi = recordInput.realisasi;
       score = recordInput.score;
       date = recordInput.date;
-      fileBuktiUrl = null;
+      fileBuktiUrl = recordInput.fileBuktiUrl;
       percentage;
       createdAt = Time.now();
       adminFeedback = null;
