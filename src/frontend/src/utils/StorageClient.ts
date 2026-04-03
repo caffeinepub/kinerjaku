@@ -18,103 +18,6 @@ const DOMAIN_SEPARATOR_FOR_METADATA = new TextEncoder().encode(
 );
 const DOMAIN_SEPARATOR_FOR_NODES = new TextEncoder().encode("ynode/");
 
-// Detect MIME type from file bytes or filename
-function detectMimeType(bytes: Uint8Array, filename?: string): string {
-  // Check magic bytes first
-  if (bytes.length >= 4) {
-    // PDF: %PDF
-    if (
-      bytes[0] === 0x25 &&
-      bytes[1] === 0x50 &&
-      bytes[2] === 0x44 &&
-      bytes[3] === 0x46
-    ) {
-      return "application/pdf";
-    }
-    // JPEG: FF D8 FF
-    if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
-      return "image/jpeg";
-    }
-    // PNG: 89 50 4E 47
-    if (
-      bytes[0] === 0x89 &&
-      bytes[1] === 0x50 &&
-      bytes[2] === 0x4e &&
-      bytes[3] === 0x47
-    ) {
-      return "image/png";
-    }
-    // GIF: GIF8
-    if (
-      bytes[0] === 0x47 &&
-      bytes[1] === 0x49 &&
-      bytes[2] === 0x46 &&
-      bytes[3] === 0x38
-    ) {
-      return "image/gif";
-    }
-    // WebP: RIFF....WEBP
-    if (
-      bytes[0] === 0x52 &&
-      bytes[1] === 0x49 &&
-      bytes[2] === 0x46 &&
-      bytes[3] === 0x46 &&
-      bytes.length >= 12 &&
-      bytes[8] === 0x57 &&
-      bytes[9] === 0x45 &&
-      bytes[10] === 0x42 &&
-      bytes[11] === 0x50
-    ) {
-      return "image/webp";
-    }
-    // ZIP / DOCX / XLSX (PK header)
-    if (bytes[0] === 0x50 && bytes[1] === 0x4b) {
-      if (filename) {
-        const ext = filename.split(".").pop()?.toLowerCase();
-        if (ext === "docx")
-          return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-        if (ext === "xlsx")
-          return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-      }
-      return "application/zip";
-    }
-  }
-
-  // Fallback to filename extension
-  if (filename) {
-    const ext = filename.split(".").pop()?.toLowerCase();
-    switch (ext) {
-      case "pdf":
-        return "application/pdf";
-      case "jpg":
-      case "jpeg":
-        return "image/jpeg";
-      case "png":
-        return "image/png";
-      case "gif":
-        return "image/gif";
-      case "webp":
-        return "image/webp";
-      case "bmp":
-        return "image/bmp";
-      case "svg":
-        return "image/svg+xml";
-      case "doc":
-        return "application/msword";
-      case "docx":
-        return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-      case "xls":
-        return "application/vnd.ms-excel";
-      case "xlsx":
-        return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-      case "txt":
-        return "text/plain";
-    }
-  }
-
-  return "application/octet-stream";
-}
-
 // Utility function for exponential backoff retry logic - retries on network/server errors only
 async function withRetry<T>(operation: () => Promise<T>): Promise<T> {
   let lastError: Error | undefined;
@@ -595,21 +498,18 @@ export class StorageClient {
   public async putFile(
     blobBytes: Uint8Array,
     onProgress?: (percentage: number) => void,
-    filename?: string,
-  ): Promise<{ hash: string; mimeType: string }> {
-    const mimeType = detectMimeType(blobBytes, filename);
-
+  ): Promise<{ hash: string }> {
     // HTTP headers for fetch requests (used for the PUT request to gateway)
     const httpHeaders: Headers = {
       "Content-Type": "application/json",
     };
-    // Create a Blob from the bytes with the correct MIME type
+    // Create a Blob from the bytes
     const file = new Blob([new Uint8Array(blobBytes)], {
-      type: mimeType,
+      type: "application/octet-stream",
     });
     // File metadata headers that will be stored with the blob tree
     const fileHeaders: Headers = {
-      "Content-Type": mimeType,
+      "Content-Type": "application/octet-stream",
       "Content-Length": file.size.toString(),
     };
 
@@ -635,7 +535,7 @@ export class StorageClient {
       httpHeaders,
       onProgress,
     );
-    return { hash: hashString, mimeType };
+    return { hash: hashString };
   }
 
   public async getDirectURL(hash: string): Promise<string> {

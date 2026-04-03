@@ -34,12 +34,7 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardList,
-  Download,
-  ExternalLink,
   FileDown,
-  FileText,
-  FolderOpen,
-  ImageIcon,
   LayoutDashboard,
   Loader2,
   LogOut,
@@ -68,73 +63,7 @@ import {
 import type { EmployeeProfile, PerformanceRecord } from "../hooks/useQueries";
 import { downloadRecapPdf } from "../utils/pdfRecap";
 
-type AdminTab =
-  | "dashboard"
-  | "pegawai"
-  | "kinerja"
-  | "rekap"
-  | "peta"
-  | "dokumentasi";
-
-function isImageUrl(url: string): boolean {
-  return /\.(jpg|jpeg|png|gif|webp|bmp|svg)([?#]|$)/i.test(url);
-}
-
-async function downloadFile(url: string, filename: string) {
-  try {
-    const response = await fetch(url);
-    const blob = await response.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = blobUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(blobUrl);
-  } catch {
-    window.open(url, "_blank");
-  }
-}
-
-function FileBuktiLink({
-  url,
-  filename,
-  ocid,
-}: { url: string; filename?: string; ocid?: string }) {
-  return (
-    <div className="flex items-center gap-1">
-      <a
-        href={url}
-        target="_blank"
-        rel="noreferrer"
-        title="Lihat file bukti"
-        data-ocid={ocid}
-        className="inline-flex items-center justify-center h-7 w-7 rounded-md text-primary hover:bg-primary/10 transition-colors"
-      >
-        {isImageUrl(url) ? (
-          <ImageIcon className="h-3.5 w-3.5" />
-        ) : (
-          <ExternalLink className="h-3.5 w-3.5" />
-        )}
-      </a>
-      <button
-        type="button"
-        title="Download file"
-        onClick={() =>
-          downloadFile(
-            url,
-            filename ||
-              (isImageUrl(url) ? "bukti-gambar.jpg" : "bukti-dokumen"),
-          )
-        }
-        className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-      >
-        <Download className="h-3.5 w-3.5" />
-      </button>
-    </div>
-  );
-}
+type AdminTab = "dashboard" | "pegawai" | "kinerja" | "rekap" | "peta";
 
 function StatCard({
   label,
@@ -363,7 +292,6 @@ function RekapPegawai({
                       <TableHead className="text-xs min-w-[200px]">
                         Feedback Admin
                       </TableHead>
-                      <TableHead className="text-xs">Bukti</TableHead>
                       <TableHead className="text-xs">Aksi</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -421,15 +349,6 @@ function RekapPegawai({
                                 }))
                               }
                             />
-                          </TableCell>
-                          <TableCell>
-                            {rec.fileBuktiUrl ? (
-                              <FileBuktiLink url={rec.fileBuktiUrl} />
-                            ) : (
-                              <span className="text-xs text-muted-foreground">
-                                -
-                              </span>
-                            )}
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1">
@@ -554,13 +473,6 @@ export default function AdminPage() {
     return Array.from(empMap.values());
   }, [employees, userProfiles]);
 
-  // Records that have file bukti
-  const dokumentasiRecords = useMemo(() => {
-    return (records ?? []).filter(
-      (r) => r.fileBuktiUrl && r.fileBuktiUrl.trim() !== "",
-    );
-  }, [records]);
-
   if (!identity) {
     navigate({ to: "/" });
     return null;
@@ -615,11 +527,6 @@ export default function AdminPage() {
       icon: <ClipboardList className="h-4 w-4" />,
     },
     { id: "peta", label: "Peta Lokasi", icon: <MapPin className="h-4 w-4" /> },
-    {
-      id: "dokumentasi",
-      label: "Data Dokumentasi",
-      icon: <FolderOpen className="h-4 w-4" />,
-    },
   ];
 
   const handleOpenEdit = (emp: EmployeeProfile) => {
@@ -1009,9 +916,6 @@ export default function AdminPage() {
                         <TableHead className="text-xs font-semibold">
                           Rating Admin
                         </TableHead>
-                        <TableHead className="text-xs font-semibold">
-                          Bukti
-                        </TableHead>
                         <TableHead className="text-xs font-semibold text-center">
                           Aksi
                         </TableHead>
@@ -1046,18 +950,6 @@ export default function AdminPage() {
                           <TableCell>
                             {rec.adminRating ? (
                               getRatingBadge(rec.adminRating)
-                            ) : (
-                              <span className="text-xs text-muted-foreground">
-                                -
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {rec.fileBuktiUrl ? (
-                              <FileBuktiLink
-                                url={rec.fileBuktiUrl}
-                                ocid={`admin.kinerja.upload_button.${idx + 1}`}
-                              />
                             ) : (
                               <span className="text-xs text-muted-foreground">
                                 -
@@ -1151,144 +1043,6 @@ export default function AdminPage() {
               </div>
             </div>
           )}
-
-          {/* Data Dokumentasi Tab */}
-          {activeTab === "dokumentasi" && (
-            <div data-ocid="admin.dokumentasi.section">
-              <h1 className="text-lg font-bold text-foreground mb-2">
-                Data Dokumentasi
-              </h1>
-              <p className="text-sm text-muted-foreground mb-5">
-                Daftar file bukti kinerja yang telah diupload oleh pegawai. Klik
-                ikon untuk melihat dokumen atau gambar.
-              </p>
-              <div className="bg-white rounded-lg border border-border shadow-sm overflow-hidden">
-                {recLoading ? (
-                  <div
-                    className="flex items-center justify-center py-12"
-                    data-ocid="admin.dokumentasi.loading_state"
-                  >
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    <span className="ml-2 text-muted-foreground text-sm">
-                      Memuat...
-                    </span>
-                  </div>
-                ) : dokumentasiRecords.length === 0 ? (
-                  <div
-                    className="text-center py-16 text-muted-foreground"
-                    data-ocid="admin.dokumentasi.empty_state"
-                  >
-                    <FolderOpen className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                    <p className="text-sm font-medium">
-                      Belum ada dokumentasi yang diupload
-                    </p>
-                    <p className="text-xs mt-1">
-                      File bukti akan muncul di sini setelah pegawai mengupload
-                      dokumen kinerja
-                    </p>
-                  </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/30">
-                        <TableHead className="text-xs font-semibold w-12">
-                          No.
-                        </TableHead>
-                        <TableHead className="text-xs font-semibold">
-                          Tanggal
-                        </TableHead>
-                        <TableHead className="text-xs font-semibold">
-                          Nama Pegawai
-                        </TableHead>
-                        <TableHead className="text-xs font-semibold">
-                          Tugas / Indikator
-                        </TableHead>
-                        <TableHead className="text-xs font-semibold">
-                          Nilai
-                        </TableHead>
-                        <TableHead className="text-xs font-semibold">
-                          Jenis File
-                        </TableHead>
-                        <TableHead className="text-xs font-semibold text-center">
-                          File Bukti
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {dokumentasiRecords.map((rec, idx) => (
-                        <TableRow
-                          key={rec.id.toString()}
-                          data-ocid={`admin.dokumentasi.item.${idx + 1}`}
-                          className={idx % 2 === 0 ? "bg-white" : "bg-muted/20"}
-                        >
-                          <TableCell className="text-xs font-medium text-muted-foreground">
-                            {idx + 1}
-                          </TableCell>
-                          <TableCell className="text-xs">{rec.date}</TableCell>
-                          <TableCell className="text-sm font-medium">
-                            {rec.employeeName}
-                          </TableCell>
-                          <TableCell className="text-xs max-w-[200px] truncate">
-                            {rec.task}
-                          </TableCell>
-                          <TableCell>{getScoreBadge(rec.score)}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="text-xs gap-1">
-                              {isImageUrl(rec.fileBuktiUrl!) ? (
-                                <>
-                                  <ImageIcon className="h-3 w-3" />
-                                  Gambar
-                                </>
-                              ) : (
-                                <>
-                                  <FileText className="h-3 w-3" />
-                                  Dokumen
-                                </>
-                              )}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 px-3 text-xs gap-1.5 text-primary border-primary hover:bg-primary/10"
-                                data-ocid={`admin.dokumentasi.upload_button.${idx + 1}`}
-                                onClick={() =>
-                                  window.open(rec.fileBuktiUrl!, "_blank")
-                                }
-                              >
-                                {isImageUrl(rec.fileBuktiUrl!) ? (
-                                  <ImageIcon className="h-3.5 w-3.5" />
-                                ) : (
-                                  <ExternalLink className="h-3.5 w-3.5" />
-                                )}
-                                Lihat
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 px-3 text-xs gap-1.5 text-muted-foreground border-border hover:bg-muted/30"
-                                onClick={() => {
-                                  const fname = isImageUrl(rec.fileBuktiUrl!)
-                                    ? `bukti-${rec.date}.jpg`
-                                    : `bukti-${rec.date}.pdf`;
-                                  downloadFile(rec.fileBuktiUrl!, fname);
-                                }}
-                              >
-                                <Download className="h-3.5 w-3.5" />
-                                Unduh
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </div>
-            </div>
-          )}
         </main>
       </div>
 
@@ -1337,9 +1091,8 @@ export default function AdminPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus Data Kinerja?</AlertDialogTitle>
             <AlertDialogDescription>
-              Yakin hapus data kinerja <strong>{deletingRecord?.task}</strong>{" "}
-              milik <strong>{deletingRecord?.employeeName}</strong>? Tindakan
-              ini tidak dapat dibatalkan.
+              Apakah Anda yakin ingin menghapus data kinerja ini? Tindakan ini
+              tidak dapat dibatalkan.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1561,7 +1314,7 @@ export default function AdminPage() {
       </Dialog>
 
       <footer className="py-3 text-center text-muted-foreground text-xs border-t border-border bg-white">
-        © {new Date().getFullYear()}. Dibangun dengan ❤️ menggunakan{" "}
+        &copy; {new Date().getFullYear()}. Dibangun dengan ❤️ menggunakan{" "}
         <a
           href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
           target="_blank"

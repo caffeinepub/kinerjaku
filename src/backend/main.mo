@@ -1,8 +1,6 @@
 import Map "mo:core/Map";
 import Time "mo:core/Time";
-import Array "mo:core/Array";
 import Nat "mo:core/Nat";
-import Iter "mo:core/Iter";
 import Order "mo:core/Order";
 import Principal "mo:core/Principal";
 import Runtime "mo:core/Runtime";
@@ -27,6 +25,7 @@ actor {
     createdAt : Time.Time;
   };
 
+  // V1: original type (kept for migration)
   type PerformanceRecordV1 = {
     id : Nat;
     employeeId : Principal;
@@ -41,6 +40,7 @@ actor {
     createdAt : Time.Time;
   };
 
+  // V2: includes adminFeedback/adminRating and fileBuktiUrl (kept for stable compat)
   type PerformanceRecord = {
     id : Nat;
     employeeId : Principal;
@@ -78,6 +78,7 @@ actor {
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
+  // Keep V1 stable var to satisfy migration (explicit discard via postupgrade)
   let performanceRecords = Map.empty<Nat, PerformanceRecordV1>();
   let performanceRecordsV2 = Map.empty<Nat, PerformanceRecord>();
 
@@ -86,6 +87,7 @@ actor {
   var nextRecordId = 0;
 
   system func postupgrade() {
+    // Migrate V1 records into V2 if V2 is empty
     if (performanceRecordsV2.size() == 0 and performanceRecords.size() > 0) {
       for ((id, rec) in performanceRecords.entries()) {
         performanceRecordsV2.add(
@@ -164,7 +166,6 @@ actor {
     realisasi : Nat;
     score : Text;
     date : Text;
-    fileBuktiUrl : ?Text;
   }) : async Nat {
     let callerRole = AccessControl.getUserRole(accessControlState, caller);
     if (not (callerRole == #admin or caller == recordInput.employeeId)) {
@@ -186,8 +187,15 @@ actor {
     } else { 0.0 };
 
     let newRecord : PerformanceRecord = {
-      recordInput with
       id = nextRecordId;
+      employeeId = recordInput.employeeId;
+      employeeName = recordInput.employeeName;
+      task = recordInput.task;
+      target = recordInput.target;
+      realisasi = recordInput.realisasi;
+      score = recordInput.score;
+      date = recordInput.date;
+      fileBuktiUrl = null;
       percentage;
       createdAt = Time.now();
       adminFeedback = null;

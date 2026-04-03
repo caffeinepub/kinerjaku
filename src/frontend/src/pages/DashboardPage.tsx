@@ -2,7 +2,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
 import {
   Table,
   TableBody,
@@ -12,23 +11,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { HttpAgent } from "@icp-sdk/core/agent";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import {
-  Download,
-  ExternalLink,
-  FileDown,
-  FileText,
-  Loader2,
-  LogOut,
-  RefreshCw,
-  Trash2,
-  Upload,
-} from "lucide-react";
-import { useRef, useState } from "react";
+import { FileDown, Loader2, LogOut, RefreshCw, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
-import { loadConfig } from "../config";
 import { clearActorCache } from "../hooks/useActor";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
@@ -37,7 +24,6 @@ import {
   useDeletePerformanceRecord,
   usePerformanceRecordsByEmployee,
 } from "../hooks/useQueries";
-import { StorageClient } from "../utils/StorageClient";
 import { downloadRecapPdf } from "../utils/pdfRecap";
 
 function getScoreBadge(score: string) {
@@ -54,29 +40,6 @@ function getScoreBadge(score: string) {
       {score}
     </Badge>
   );
-}
-
-function isImageUrl(url: string): boolean {
-  return /\.(jpg|jpeg|png|gif|webp|bmp|svg)([?#]|$)/i.test(url);
-}
-
-// Download file from URL with proper filename
-async function downloadFile(url: string, filename: string) {
-  try {
-    const response = await fetch(url);
-    const blob = await response.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = blobUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(blobUrl);
-  } catch {
-    // Fallback: open in new tab
-    window.open(url, "_blank");
-  }
 }
 
 export default function DashboardPage() {
@@ -100,10 +63,7 @@ export default function DashboardPage() {
     target: "",
     realisasi: "",
   });
-  const [fileName, setFileName] = useState("");
-  const fileRef = useRef<HTMLInputElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
 
   if (!identity) {
     navigate({ to: "/" });
@@ -143,37 +103,11 @@ export default function DashboardPage() {
     }
 
     setIsSubmitting(true);
-    setUploadProgress(0);
     try {
       const percentage = (realisasiNum / targetNum) * 100;
       const score =
         percentage >= 80 ? "Baik" : percentage >= 60 ? "Cukup" : "Kurang";
       const today = new Date().toISOString().split("T")[0];
-
-      let fileUrl: string | undefined = undefined;
-      const file = fileRef.current?.files?.[0];
-      if (file) {
-        const config = await loadConfig();
-        const agent = new HttpAgent({ host: config.backend_host });
-        if (config.backend_host?.includes("localhost")) {
-          await agent.fetchRootKey().catch(() => {});
-        }
-        const storageClient = new StorageClient(
-          config.bucket_name,
-          config.storage_gateway_url,
-          config.backend_canister_id,
-          config.project_id,
-          agent,
-        );
-        const arrayBuffer = await file.arrayBuffer();
-        // Pass filename so StorageClient can detect the correct MIME type
-        const { hash } = await storageClient.putFile(
-          new Uint8Array(arrayBuffer),
-          (pct) => setUploadProgress(pct),
-          file.name,
-        );
-        fileUrl = await storageClient.getDirectURL(hash);
-      }
 
       await createRecord.mutateAsync({
         employeeName: form.namaPegawai || displayName,
@@ -183,14 +117,10 @@ export default function DashboardPage() {
         score,
         date: today,
         employeeId: identity.getPrincipal(),
-        fileBuktiUrl: fileUrl,
       });
 
       toast.success("Data kinerja berhasil disimpan!");
       setForm((prev) => ({ ...prev, tugas: "", target: "", realisasi: "" }));
-      setFileName("");
-      if (fileRef.current) fileRef.current.value = "";
-      setUploadProgress(0);
       refetch();
     } catch (err) {
       toast.error(`Gagal menyimpan: ${String(err)}`);
@@ -214,22 +144,6 @@ export default function DashboardPage() {
     clear();
     qc.clear();
     navigate({ to: "/" });
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error("Ukuran file maksimal 10MB");
-        e.target.value = "";
-        return;
-      }
-      setFileName(file.name);
-    }
-  };
-
-  const triggerFileInput = () => {
-    fileRef.current?.click();
   };
 
   const handleDownloadPdf = () => {
@@ -363,42 +277,6 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label>File Bukti Kinerja</Label>
-                <button
-                  type="button"
-                  className="w-full border border-dashed border-border rounded-md px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-muted/30 transition-colors text-left"
-                  onClick={triggerFileInput}
-                  onKeyDown={(e) => e.key === "Enter" && triggerFileInput()}
-                  data-ocid="performance.dropzone"
-                >
-                  <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="text-sm text-muted-foreground">
-                    {fileName || "Pilih file bukti (gambar / PDF, maks. 10MB)"}
-                  </span>
-                </button>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  className="hidden"
-                  onChange={handleFileChange}
-                  accept="image/*,.pdf,.doc,.docx"
-                  data-ocid="performance.upload_button"
-                />
-                {uploadProgress > 0 && uploadProgress < 100 && (
-                  <div
-                    className="space-y-1"
-                    data-ocid="performance.loading_state"
-                  >
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Mengupload file...</span>
-                      <span>{uploadProgress}%</span>
-                    </div>
-                    <Progress value={uploadProgress} className="h-1.5" />
-                  </div>
-                )}
-              </div>
-
               <Button
                 type="submit"
                 data-ocid="performance.submit_button"
@@ -488,9 +366,6 @@ export default function DashboardPage() {
                         Nilai
                       </TableHead>
                       <TableHead className="text-xs font-semibold">
-                        Bukti
-                      </TableHead>
-                      <TableHead className="text-xs font-semibold">
                         Aksi
                       </TableHead>
                     </TableRow>
@@ -516,52 +391,6 @@ export default function DashboardPage() {
                         </TableCell>
                         <TableCell>{getScoreBadge(rec.score)}</TableCell>
                         <TableCell>
-                          {rec.fileBuktiUrl ? (
-                            <div className="flex items-center gap-1">
-                              <a
-                                href={rec.fileBuktiUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                title="Lihat file bukti"
-                                data-ocid={`records.upload_button.${idx + 1}`}
-                                className="inline-flex items-center justify-center h-7 w-7 rounded-md text-primary hover:bg-primary/10 transition-colors"
-                              >
-                                {isImageUrl(rec.fileBuktiUrl) ? (
-                                  <img
-                                    src={rec.fileBuktiUrl}
-                                    alt="Bukti"
-                                    className="h-6 w-6 object-cover rounded"
-                                  />
-                                ) : (
-                                  <ExternalLink className="h-3.5 w-3.5" />
-                                )}
-                              </a>
-                              <button
-                                type="button"
-                                title="Download file"
-                                onClick={() => {
-                                  const ext = rec.fileBuktiUrl!.includes(".pdf")
-                                    ? "bukti.pdf"
-                                    : isImageUrl(rec.fileBuktiUrl!)
-                                      ? "bukti-gambar.jpg"
-                                      : "bukti-dokumen";
-                                  downloadFile(
-                                    rec.fileBuktiUrl!,
-                                    `kinerja-${rec.date}-${ext}`,
-                                  );
-                                }}
-                                className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                              >
-                                <Download className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">
-                              -
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -583,7 +412,7 @@ export default function DashboardPage() {
       </main>
 
       <footer className="py-3 text-center text-muted-foreground text-xs border-t border-border bg-white">
-        © {new Date().getFullYear()}. Dibangun dengan ❤️ menggunakan{" "}
+        &copy; {new Date().getFullYear()}. Dibangun dengan ❤️ menggunakan{" "}
         <a
           href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
           target="_blank"

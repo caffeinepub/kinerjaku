@@ -116,7 +116,6 @@ export function useCreatePerformanceRecord() {
       score: string;
       target: bigint;
       employeeId: Principal;
-      fileBuktiUrl?: string;
     }) => {
       const actor = await waitForActor();
       return actor.createPerformanceRecord(input);
